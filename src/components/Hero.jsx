@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 
-const DEMO_CODES = ['FX123456789US', 'FX987654321US', 'FX555000111US'];
-
 export default function Hero({ onTrack, loading, error }) {
-  const [input, setInput]       = useState('');
-  const [activeTab, setActiveTab] = useState('track');
+  const [input, setInput]           = useState('');
+  const [activeTab, setActiveTab]   = useState('track');
   const [inputError, setInputError] = useState(false);
 
   function handleTrack() {
@@ -75,16 +73,6 @@ export default function Hero({ onTrack, loading, error }) {
                 <i className="fa-solid fa-triangle-exclamation"></i> {error}
               </div>
             )}
-
-            <p className="tracking-hint">
-              Try demo codes:{' '}
-              {DEMO_CODES.map((code, i) => (
-                <React.Fragment key={code}>
-                  <span className="demo-code" onClick={() => setInput(code)}>{code}</span>
-                  {i < DEMO_CODES.length - 1 ? ', ' : ''}
-                </React.Fragment>
-              ))}
-            </p>
           </div>
         </div>
       </div>

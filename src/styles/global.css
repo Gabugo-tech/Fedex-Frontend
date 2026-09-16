@@ -174,12 +174,7 @@ a:hover { color: var(--orange); }
 .btn-track:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .btn-track:disabled { opacity: 0.7; pointer-events: none; }
 
-.tracking-hint { margin-top: 12px; font-size: 12px; color: var(--gray-400); }
-.demo-code {
-  color: var(--purple); font-weight: 600; cursor: pointer;
-  border-bottom: 1px dashed var(--purple);
-}
-.demo-code:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
 
 /* ===== ERROR BANNER ===== */
 .error-banner {

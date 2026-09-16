@@ -44,7 +44,7 @@ function NotFound({ trackingNumber }) {
       <h3>No Results Found</h3>
       <p>We couldn't find any shipment information for <strong>{trackingNumber}</strong>.</p>
       <p style={{ marginTop: '8px', fontSize: '13px', color: '#aaa' }}>
-        Make sure the tracking number is correct and try again.
+        Please check your tracking number and try again. If the issue persists, contact support.
       </p>
     </div>
   );
