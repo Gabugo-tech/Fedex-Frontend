@@ -25,7 +25,3 @@ export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session;
 }
-
-export function getToken() {
-  return supabase.auth.getSession().then(({ data }) => data.session?.access_token);
-}

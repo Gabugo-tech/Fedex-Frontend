@@ -1,5 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+
+function loadLeaflet() {
+  return new Promise((resolve) => {
+    // CSS — inject once
+    if (!document.getElementById('leaflet-css')) {
+      const link = Object.assign(document.createElement('link'), {
+        id: 'leaflet-css', rel: 'stylesheet', href: LEAFLET_CSS,
+      });
+      document.head.appendChild(link);
+    }
+
+    // JS — already loaded
+    if (window.L) return resolve();
+
+    // JS — script already injected but not yet ready
+    if (document.getElementById('leaflet-js')) {
+      const wait = setInterval(() => {
+        if (window.L) { clearInterval(wait); resolve(); }
+      }, 50);
+      return;
+    }
+
+    // JS — inject fresh
+    const script = Object.assign(document.createElement('script'), {
+      id: 'leaflet-js', src: LEAFLET_JS,
+    });
+    script.onload = resolve;
+    document.head.appendChild(script);
+  });
+}
+
 export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onClose }) {
   const mapRef    = useRef(null);
   const leafletRef = useRef(null);
@@ -10,35 +43,26 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
   });
 
   useEffect(() => {
-    // Dynamically load Leaflet CSS
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id   = 'leaflet-css';
-      link.rel  = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
-    // Dynamically load Leaflet JS
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => initMap();
-    document.head.appendChild(script);
+    loadLeaflet().then(initMap);
 
     return () => {
-      if (leafletRef.current) leafletRef.current.remove();
+      if (leafletRef.current) {
+        leafletRef.current.remove();
+        leafletRef.current = null;
+      }
     };
   }, []);
 
   function initMap() {
-    const L = window.L;
+    const L   = window.L;
     const map = L.map(mapRef.current).setView([coords.lat, coords.lng], 5);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
     const marker = L.marker([coords.lat, coords.lng], { draggable: true }).addTo(map);
-    marker.bindPopup('Drag me to set location').openPopup();
+    marker.bindPopup('Drag me or click the map to set location').openPopup();
 
     marker.on('dragend', e => {
       const { lat, lng } = e.target.getLatLng();
@@ -47,17 +71,13 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
 
     map.on('click', e => {
       const { lat, lng } = e.latlng;
-      const newCoords = { lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) };
-      marker.setLatLng([newCoords.lat, newCoords.lng]);
-      setCoords(newCoords);
+      const c = { lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) };
+      marker.setLatLng([c.lat, c.lng]);
+      setCoords(c);
     });
 
     leafletRef.current = map;
     markerRef.current  = marker;
-  }
-
-  function handleConfirm() {
-    onConfirm(coords.lat, coords.lng);
   }
 
   return (
@@ -65,7 +85,7 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
       <div className="map-picker-modal">
         <div className="map-picker-header">
           <h3><i className="fa-solid fa-map-location-dot"></i> Pick Package Location</h3>
-          <button className="btn-icon btn-close" onClick={onClose}>
+          <button className="btn-icon btn-close" onClick={onClose} aria-label="Close">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
@@ -77,7 +97,7 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
         </div>
         <div className="map-picker-actions">
           <button className="btn-admin-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-admin-primary" onClick={handleConfirm}>
+          <button className="btn-admin-primary" onClick={() => onConfirm(coords.lat, coords.lng)}>
             <i className="fa-solid fa-check"></i> Confirm Location
           </button>
         </div>

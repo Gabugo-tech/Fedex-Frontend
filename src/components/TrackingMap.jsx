@@ -1,40 +1,67 @@
 import React, { useEffect, useRef } from 'react';
 
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+
+function loadLeaflet() {
+  return new Promise((resolve) => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = Object.assign(document.createElement('link'), {
+        id: 'leaflet-css', rel: 'stylesheet', href: LEAFLET_CSS,
+      });
+      document.head.appendChild(link);
+    }
+
+    if (window.L) return resolve();
+
+    if (document.getElementById('leaflet-js')) {
+      const wait = setInterval(() => {
+        if (window.L) { clearInterval(wait); resolve(); }
+      }, 50);
+      return;
+    }
+
+    const script = Object.assign(document.createElement('script'), {
+      id: 'leaflet-js', src: LEAFLET_JS,
+    });
+    script.onload = resolve;
+    document.head.appendChild(script);
+  });
+}
+
 export default function TrackingMap({ lat, lng, label }) {
-  const mapRef     = useRef(null);
+  const mapRef      = useRef(null);
   const instanceRef = useRef(null);
 
   useEffect(() => {
     if (!lat || !lng) return;
 
-    // Load Leaflet CSS once
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id   = 'leaflet-css';
-      link.rel  = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
+    let cancelled = false;
 
-    function initMap() {
-      const L = window.L;
+    loadLeaflet().then(() => {
+      if (cancelled || !mapRef.current) return;
+
+      // Destroy previous instance if coords changed
       if (instanceRef.current) {
         instanceRef.current.remove();
         instanceRef.current = null;
       }
 
-      const map = L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: false })
-        .setView([lat, lng], 6);
+      const L   = window.L;
+      const map = L.map(mapRef.current, {
+        zoomControl: true,
+        scrollWheelZoom: false,
+        attributionControl: true,
+      }).setView([lat, lng], 6);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
-      // Custom FedEx-purple marker
       const icon = L.divIcon({
         className: '',
         html: `<div class="map-marker"><i class="fa-solid fa-location-dot"></i></div>`,
-        iconSize: [36, 36],
+        iconSize:   [36, 36],
         iconAnchor: [18, 36],
         popupAnchor: [0, -36],
       });
@@ -45,26 +72,10 @@ export default function TrackingMap({ lat, lng, label }) {
         .openPopup();
 
       instanceRef.current = map;
-    }
-
-    if (window.L) {
-      initMap();
-    } else {
-      if (!document.getElementById('leaflet-js')) {
-        const script = document.createElement('script');
-        script.id  = 'leaflet-js';
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.onload = initMap;
-        document.head.appendChild(script);
-      } else {
-        // Script tag exists but may not be loaded yet
-        const wait = setInterval(() => {
-          if (window.L) { clearInterval(wait); initMap(); }
-        }, 100);
-      }
-    }
+    });
 
     return () => {
+      cancelled = true;
       if (instanceRef.current) {
         instanceRef.current.remove();
         instanceRef.current = null;

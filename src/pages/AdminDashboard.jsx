@@ -21,9 +21,10 @@ const EMPTY_SHIPMENT = {
   recipient: '', progress_step: 1, map_lat: '', map_lng: '',
 };
 
-const EMPTY_EVENT = {
+// Factory function so the timestamp is fresh each time it's called
+const makeEmptyEvent = () => ({
   status: '', location: '', event_time: new Date().toISOString().slice(0, 16), is_latest: false,
-};
+});
 
 export default function AdminDashboard({ session, onLogout }) {
   const token = session?.access_token;
@@ -35,7 +36,7 @@ export default function AdminDashboard({ session, onLogout }) {
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [shipmentDetail, setShipmentDetail] = useState(null);
   const [form, setForm]                 = useState(EMPTY_SHIPMENT);
-  const [eventForm, setEventForm]       = useState(EMPTY_EVENT);
+  const [eventForm, setEventForm]       = useState(makeEmptyEvent);
   const [locationForm, setLocationForm] = useState({ map_lat: '', map_lng: '', current_location: '' });
   const [saving, setSaving]             = useState(false);
   const [toast, setToast]               = useState(null);
@@ -147,7 +148,7 @@ export default function AdminDashboard({ session, onLogout }) {
         event_time: new Date(eventForm.event_time).toISOString(),
       }, token);
       showToast('Event added');
-      setEventForm(EMPTY_EVENT);
+      setEventForm(makeEmptyEvent());
       loadShipmentDetail(selectedShipment.id);
     } catch (e) { showToast(e.message, 'error'); }
     finally { setSaving(false); }
