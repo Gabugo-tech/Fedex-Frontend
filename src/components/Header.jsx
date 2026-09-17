@@ -45,9 +45,11 @@ export default function Header({ user, onSignInClick, onSignOut }) {
             <a href="#">Locations</a>
             <a href="#">Support</a>
           </nav>
-          <div className="header-actions">
-            <button className="btn-primary">Create a Shipment</button>
-          </div>
+          {user && (
+            <div className="header-actions">
+              <button className="btn-primary">Create a Shipment</button>
+            </div>
+          )}
           <button className="hamburger" onClick={() => setMenuOpen(o => !o)}>
             <i className={`fa-solid ${menuOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
           </button>
