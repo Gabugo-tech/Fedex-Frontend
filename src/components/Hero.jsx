@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 
 export default function Hero({ onTrack, loading, error }) {
   const [input, setInput]           = useState('');
-  const [activeTab, setActiveTab]   = useState('track');
   const [inputError, setInputError] = useState(false);
   // Fix #10: use a ref to scroll after results are rendered
   const didTrackRef = useRef(false);
@@ -38,15 +37,7 @@ export default function Hero({ onTrack, loading, error }) {
         <div className="tracking-card">
           {/* Tabs */}
           <div className="tracking-tabs">
-            {['track', 'manage', 'obtain'].map(tab => (
-              <button
-                key={tab}
-                className={`tab ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'track' ? 'Track' : tab === 'manage' ? 'Manage Delivery' : 'Obtain Proof'}
-              </button>
-            ))}
+            <button className="tab active">Track</button>
           </div>
 
           <div className="tracking-body">
