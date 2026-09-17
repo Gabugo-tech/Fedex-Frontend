@@ -1123,3 +1123,148 @@ a:hover { color: var(--orange); }
   width: 32px !important; height: 32px !important;
   display: flex; align-items: center; justify-content: center;
 }
+
+/* ===== POLISHED RESULT CARD ===== */
+
+/* Header layout */
+.result-card-header {
+  background: linear-gradient(135deg, var(--purple-dark) 0%, var(--purple) 100%);
+  border-bottom: none !important;
+  padding: 24px 28px !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+.result-card-header::after {
+  content: '';
+  position: absolute; right: -40px; top: -40px;
+  width: 160px; height: 160px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+}
+.result-card-header-left  { flex: 1; }
+.result-card-header-right {
+  position: absolute; top: 24px; right: 28px;
+}
+
+/* Tracking number row with copy button */
+.tracking-number-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 6px;
+}
+.tracking-number-label {
+  color: rgba(255,255,255,0.6) !important;
+  font-size: 11px !important;
+  letter-spacing: 1.5px !important;
+  margin-bottom: 4px;
+}
+.tracking-number-value {
+  color: var(--white) !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: 2px !important;
+  font-family: 'Courier New', monospace;
+}
+
+/* Copy button */
+.btn-copy {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: var(--white);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-copy:hover { background: rgba(255,255,255,0.25); }
+
+/* Service badge in header */
+.tracking-service-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
+  font-size: 12px; font-weight: 600;
+  padding: 4px 12px; border-radius: 50px;
+}
+.tracking-weight {
+  border-left: 1px solid rgba(255,255,255,0.2);
+  padding-left: 8px; margin-left: 4px;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Status badge — override for dark header */
+.result-card-header .status-badge {
+  font-size: 11px !important;
+  padding: 6px 14px !important;
+}
+
+/* Info blocks with icon */
+.result-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: var(--white);
+}
+.info-block {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  padding: 20px 24px !important;
+  border-right: 1px solid var(--gray-200);
+  border-bottom: none;
+}
+.info-block:last-child { border-right: none; }
+
+.info-block-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--gray-100);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--purple); font-size: 14px; flex-shrink: 0;
+  margin-top: 2px;
+}
+.info-block-icon.delivered { background: #e6f4ed; color: var(--green); }
+
+/* Admin form — generate button */
+.tracking-gen-row {
+  display: flex; gap: 8px; align-items: stretch;
+}
+.tracking-gen-row input { flex: 1; }
+.btn-generate {
+  background: linear-gradient(135deg, var(--purple), var(--orange));
+  color: var(--white); border: none;
+  padding: 0 16px; border-radius: 6px;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Inter', sans-serif;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+.btn-generate:hover { opacity: 0.88; }
+
+.field-hint {
+  font-size: 11px; color: var(--gray-400);
+  margin-top: 5px; font-style: italic;
+}
+
+/* ===== RESPONSIVE FIXES for polished card ===== */
+@media (max-width: 768px) {
+  .result-card-header { padding: 20px 18px !important; }
+  .result-card-header-right { position: static; margin-top: 8px; }
+  .result-card-body { grid-template-columns: 1fr; }
+  .info-block { border-right: none !important; border-bottom: 1px solid var(--gray-200) !important; }
+  .info-block:last-child { border-bottom: none !important; }
+  .tracking-number-value { font-size: 17px !important; letter-spacing: 1px !important; }
+  .tracking-gen-row { flex-direction: column; }
+  .btn-generate { padding: 10px; justify-content: center; }
+}
+@media (max-width: 480px) {
+  .tracking-number-value { font-size: 14px !important; }
+  .result-card-header .status-badge { font-size: 10px !important; padding: 5px 10px !important; }
+}

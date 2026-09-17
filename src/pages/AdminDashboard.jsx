@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { signOut } from '../api/auth';
 import {
   getShipments, deleteShipment, updateLocation, addEvent, deleteEvent,
   createShipment, updateShipment, getShipment,
 } from '../api/admin';
 import AdminMapPicker from '../components/AdminMapPicker';
+import { generateTrackingNumber } from '../utils/generateTrackingNumber';
 
 const STATUSES = [
   { value: 'pending',      label: 'Pending',          icon: 'fa-clock' },
@@ -432,14 +434,23 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tracking Number *</label>
-                    <input type="text" placeholder="e.g. FX123456789US"
-                      value={form.tracking_number} required
-                      disabled={!!editingShipment}
-                      onChange={e => setForm(f => ({ ...f, tracking_number: e.target.value.toUpperCase() }))} />
+                    <div className="tracking-gen-row">
+                      <input type="text" placeholder="e.g. GBT-2026-A4K9BZ2M"
+                        value={form.tracking_number} required
+                        disabled={!!editingShipment}
+                        onChange={e => setForm(f => ({ ...f, tracking_number: e.target.value.toUpperCase() }))} />
+                      {!editingShipment && (
+                        <button type="button" className="btn-generate"
+                          onClick={() => setForm(f => ({ ...f, tracking_number: generateTrackingNumber() }))}>
+                          <i className="fa-solid fa-wand-magic-sparkles"></i> Generate
+                        </button>
+                      )}
+                    </div>
+                    <p className="field-hint">Format: GBT-YEAR-8CHARS (e.g. GBT-2026-A4K9BZ2M)</p>
                   </div>
                   <div className="form-group">
                     <label>Service *</label>
-                    <input type="text" placeholder="e.g. FedEx Express"
+                    <input type="text" placeholder="e.g. GBT Express"
                       value={form.service} required
                       onChange={e => setForm(f => ({ ...f, service: e.target.value }))} />
                   </div>
