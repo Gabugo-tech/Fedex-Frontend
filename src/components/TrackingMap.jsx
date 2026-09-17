@@ -28,21 +28,33 @@ function loadLeaflet() {
 
 /**
  * Build a smooth arc of `steps` points between two lat/lng coords.
- * Uses a slight vertical curve to make it look like a flight path.
+ * Uses a quadratic bezier curve to simulate a flight path.
  */
 function buildArc(lat1, lng1, lat2, lng2, steps = 120) {
   const points = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    // Quadratic bezier with a control point lifted above the midpoint
     const midLat = (lat1 + lat2) / 2 + Math.abs(lat2 - lat1) * 0.25;
     const midLng = (lng1 + lng2) / 2;
-    // Quadratic interpolation
     const lat = (1 - t) * (1 - t) * lat1 + 2 * (1 - t) * t * midLat + t * t * lat2;
     const lng = (1 - t) * (1 - t) * lng1 + 2 * (1 - t) * t * midLng + t * t * lng2;
     points.push({ lat, lng });
   }
   return points;
+}
+
+/**
+ * Calculate the geographic bearing (in degrees) from point A to point B.
+ * Returns 0–360 where 0 = North, 90 = East, 180 = South, 270 = West.
+ */
+function getBearing(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const φ1 = toRad(lat1), φ2 = toRad(lat2);
+  const Δλ = toRad(lng2 - lng1);
+  const x = Math.sin(Δλ) * Math.cos(φ2);
+  const y = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const bearing = Math.atan2(x, y) * 180 / Math.PI;
+  return (bearing + 360) % 360; // normalise to 0–360
 }
 
 export default function TrackingMap({
@@ -174,11 +186,18 @@ export default function TrackingMap({
           trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
 
           // Rotate plane icon to face direction of travel
+          // fa-plane points East (right) by default, so bearing 0 (North) needs -90° offset
           if (idx > 0) {
             const prev = arc[idx - 1];
-            const angle = Math.atan2(pos.lng - prev.lng, pos.lat - prev.lat) * (180 / Math.PI);
+            const bearing = getBearing(prev.lat, prev.lng, pos.lat, pos.lng);
+            // bearing 0 = North, icon default = East, so subtract 90
+            const rotateDeg = bearing - 90;
             const el = marker.getElement();
-            if (el) el.style.transform += ` rotate(${angle}deg)`;
+            if (el) {
+              // Replace transform entirely — never accumulate
+              el.style.transformOrigin = 'center center';
+              el.style.transform = `rotate(${rotateDeg}deg)`;
+            }
           }
         }, STEP_MS);
 
