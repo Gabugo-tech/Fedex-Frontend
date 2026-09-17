@@ -1,4 +1,5 @@
 import React from 'react';
+import TrackingMap from './TrackingMap';
 
 const STATUS_CLASS = {
   delivered:      'delivered',
@@ -57,6 +58,15 @@ export default function ResultCard({ result, steps }) {
           </div>
         )}
       </div>
+
+      {/* Live Map */}
+      {result.map_lat && result.map_lng && (
+        <TrackingMap
+          lat={parseFloat(result.map_lat)}
+          lng={parseFloat(result.map_lng)}
+          label={result.current_location}
+        />
+      )}
 
       {/* Progress bar */}
       <div className="progress-section">
