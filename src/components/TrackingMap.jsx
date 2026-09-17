@@ -26,19 +26,21 @@ function loadLeaflet() {
   });
 }
 
-// Interpolate between two lat/lng points by fraction t (0..1)
-function interpolate(lat1, lng1, lat2, lng2, t) {
-  return {
-    lat: lat1 + (lat2 - lat1) * t,
-    lng: lng1 + (lng2 - lng1) * t,
-  };
-}
-
-// Build a great-circle arc of N points between two coords
-function buildArc(lat1, lng1, lat2, lng2, steps = 80) {
+/**
+ * Build a smooth arc of `steps` points between two lat/lng coords.
+ * Uses a slight vertical curve to make it look like a flight path.
+ */
+function buildArc(lat1, lng1, lat2, lng2, steps = 120) {
   const points = [];
   for (let i = 0; i <= steps; i++) {
-    points.push(interpolate(lat1, lng1, lat2, lng2, i / steps));
+    const t = i / steps;
+    // Quadratic bezier with a control point lifted above the midpoint
+    const midLat = (lat1 + lat2) / 2 + Math.abs(lat2 - lat1) * 0.25;
+    const midLng = (lng1 + lng2) / 2;
+    // Quadratic interpolation
+    const lat = (1 - t) * (1 - t) * lat1 + 2 * (1 - t) * t * midLat + t * t * lat2;
+    const lng = (1 - t) * (1 - t) * lng1 + 2 * (1 - t) * t * midLng + t * t * lng2;
+    points.push({ lat, lng });
   }
   return points;
 }
@@ -54,34 +56,28 @@ export default function TrackingMap({
   const animRef     = useRef(null);
 
   useEffect(() => {
-    // Need at minimum a current position
-    if (!lat || !lng) return;
+    const hasRoute  = originLat && originLng && destLat && destLng;
+    const hasPos    = lat && lng;
+
+    // Need at least a route or a position
+    if (!hasRoute && !hasPos) return;
 
     let cancelled = false;
 
     loadLeaflet().then(() => {
       if (cancelled || !mapRef.current) return;
 
-      // Destroy previous instance
-      if (instanceRef.current) {
-        instanceRef.current.remove();
-        instanceRef.current = null;
-      }
-      if (animRef.current) {
-        clearInterval(animRef.current);
-        animRef.current = null;
-      }
+      // Clean up previous instance
+      if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
+      if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
 
       const L = window.L;
-      const hasRoute = originLat && originLng && destLat && destLng;
 
-      // Decide initial view
-      let centerLat = lat, centerLng = lng, zoom = 5;
-      if (hasRoute) {
-        centerLat = (originLat + destLat) / 2;
-        centerLng = (originLng + destLng) / 2;
-        zoom = 3;
-      }
+      // ── MAP VIEW ──
+      // Center between origin and destination if we have a route
+      const centerLat = hasRoute ? (originLat + destLat) / 2 : lat;
+      const centerLng = hasRoute ? (originLng + destLng) / 2 : lng;
+      const zoom      = hasRoute ? 4 : 6;
 
       const map = L.map(mapRef.current, {
         zoomControl: true,
@@ -93,123 +89,154 @@ export default function TrackingMap({
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
-      // ── ROUTE LINE ──
-      if (hasRoute) {
-        const arc = buildArc(originLat, originLng, destLat, destLng, 80);
-        const latlngs = arc.map(p => [p.lat, p.lng]);
-
-        // Dashed grey route line (full path)
-        L.polyline(latlngs, {
-          color: '#cccccc',
-          weight: 2,
-          dashArray: '6 6',
-          opacity: 0.8,
-        }).addTo(map);
-
-        // Origin marker
-        const originIcon = L.divIcon({
-          className: '',
-          html: `<div class="map-origin-dot" title="Origin"></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        });
-        L.marker([originLat, originLng], { icon: originIcon })
-          .addTo(map)
-          .bindPopup(`<strong>📦 Origin</strong><br/>${label?.split('—')[0] || 'Pickup location'}`);
-
-        // Destination marker
-        const destIcon = L.divIcon({
-          className: '',
-          html: `<div class="map-dest-dot" title="Destination"></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        });
-        L.marker([destLat, destLng], { icon: destIcon })
-          .addTo(map)
-          .bindPopup(`<strong>🏠 Destination</strong><br/>Delivery address`);
-      }
-
-      // ── PACKAGE MARKER (current position) ──
-      const pkgIcon = L.divIcon({
-        className: '',
-        html: `<div class="map-pkg-marker"><i class="fa-solid fa-location-dot"></i></div>`,
-        iconSize:    [36, 36],
-        iconAnchor:  [18, 36],
-        popupAnchor: [0, -36],
-      });
-
-      const marker = L.marker([lat, lng], { icon: pkgIcon })
-        .addTo(map)
-        .bindPopup(`<strong>${label || 'Package Location'}</strong>`)
-        .openPopup();
-
       instanceRef.current = map;
 
-      // ── ANIMATION: only if package is in transit and we have a full route ──
-      const isMoving = hasRoute &&
-        status !== 'delivered' &&
-        status !== 'pending';
+      if (hasRoute) {
+        const arc = buildArc(originLat, originLng, destLat, destLng, 120);
+        const latlngs = arc.map(p => [p.lat, p.lng]);
 
-      if (isMoving) {
-        // Determine progress fraction from current lat/lng relative to route
-        // Find closest arc point as starting index
-        const arc = buildArc(originLat, originLng, destLat, destLng, 200);
-        let startIdx = 0;
-        let minDist = Infinity;
-        arc.forEach((p, i) => {
-          const d = Math.hypot(p.lat - lat, p.lng - lng);
-          if (d < minDist) { minDist = d; startIdx = i; }
+        // Full route line (dashed grey)
+        L.polyline(latlngs, {
+          color: '#c0b0e0',
+          weight: 2.5,
+          dashArray: '7 5',
+          opacity: 0.7,
+        }).addTo(map);
+
+        // ── ORIGIN DOT ──
+        L.marker([originLat, originLng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="map-origin-dot"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7],
+          }),
+        }).addTo(map).bindPopup('<strong>📦 Origin</strong>');
+
+        // ── DESTINATION DOT ──
+        L.marker([destLat, destLng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="map-dest-dot"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7],
+          }),
+        }).addTo(map).bindPopup('<strong>🏠 Destination</strong>');
+
+        // ── PACKAGE MARKER — starts at origin ──
+        const pkgIcon = L.divIcon({
+          className: '',
+          html: `<div class="map-pkg-marker"><i class="fa-solid fa-plane" style="color:var(--purple);font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35))"></i></div>`,
+          iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16],
         });
 
-        let idx = startIdx;
-        const STEP_INTERVAL = 120; // ms between animation steps
-        const STEP_SIZE     = 1;   // arc points per step
+        const marker = L.marker([arc[0].lat, arc[0].lng], { icon: pkgIcon })
+          .addTo(map)
+          .bindPopup(`<strong>${label || 'Package Location'}</strong>`);
+
+        // Trailing "travelled" polyline (purple)
+        const trailLayer = L.polyline([], {
+          color: 'var(--purple)',
+          weight: 3,
+          opacity: 0.6,
+        }).addTo(map);
+
+        // ── ANIMATION ──
+        // For delivered packages: do a single pass showing the completed journey
+        // For all others: loop continuously so customers always see movement
+        const isDelivered = status === 'delivered';
+        let idx = 0;
+
+        // How fast the marker moves — slower = more realistic feeling
+        const STEP_MS   = isDelivered ? 40 : 80;  // ms per tick
+        const STEP_SIZE = 1;                        // arc points per tick
 
         animRef.current = setInterval(() => {
           if (cancelled) { clearInterval(animRef.current); return; }
-          idx = (idx + STEP_SIZE);
-          if (idx >= arc.length) idx = arc.length - 1;
+
+          idx += STEP_SIZE;
+
+          // Loop back to start for active shipments; stop at end for delivered
+          if (idx > arc.length - 1) {
+            if (isDelivered) {
+              idx = arc.length - 1;
+              clearInterval(animRef.current);
+              animRef.current = null;
+            } else {
+              // Reset: restart from origin for continuous loop
+              idx = 0;
+              trailLayer.setLatLngs([]);
+            }
+          }
 
           const pos = arc[idx];
           marker.setLatLng([pos.lat, pos.lng]);
 
-          // Gently pan the map to follow the marker
-          if (idx % 20 === 0) {
-            map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.5 });
-          }
+          // Grow the trail behind the marker
+          trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
 
-          // Stop at destination
-          if (idx >= arc.length - 1) {
-            clearInterval(animRef.current);
-            animRef.current = null;
+          // Rotate plane icon to face direction of travel
+          if (idx > 0) {
+            const prev = arc[idx - 1];
+            const angle = Math.atan2(pos.lng - prev.lng, pos.lat - prev.lat) * (180 / Math.PI);
+            const el = marker.getElement();
+            if (el) el.style.transform += ` rotate(${angle}deg)`;
           }
-        }, STEP_INTERVAL);
+        }, STEP_MS);
+
+      } else if (hasPos) {
+        // No route data — just show a static pin at current position
+        const pkgIcon = L.divIcon({
+          className: '',
+          html: `<div class="map-pkg-marker"><i class="fa-solid fa-location-dot" style="color:var(--purple);font-size:28px;"></i></div>`,
+          iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+        });
+        L.marker([lat, lng], { icon: pkgIcon })
+          .addTo(map)
+          .bindPopup(`<strong>${label || 'Package Location'}</strong>`)
+          .openPopup();
       }
     });
 
     return () => {
       cancelled = true;
-      if (animRef.current) { clearInterval(animRef.current); animRef.current = null; }
-      if (instanceRef.current) { instanceRef.current.remove(); instanceRef.current = null; }
+      if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
+      if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
     };
   }, [lat, lng, label, originLat, originLng, destLat, destLng, status]);
 
-  if (!lat || !lng) return null;
+  // Show map if we have either a route or a position
+  const canShow = (originLat && originLng && destLat && destLng) || (lat && lng);
+  if (!canShow) return null;
+
+  const isLive = status === 'in-transit' || status === 'out-delivery';
 
   return (
     <div className="tracking-map-section">
       <h4>
         <i className="fa-solid fa-location-dot"></i> Live Package Location
-        {status === 'in-transit' || status === 'out-delivery'
-          ? <span className="live-badge"><i className="fa-solid fa-circle"></i> LIVE</span>
-          : null
-        }
+        {isLive && (
+          <span className="live-badge">
+            <i className="fa-solid fa-circle"></i> LIVE
+          </span>
+        )}
+        {status === 'delivered' && (
+          <span className="delivered-badge">
+            <i className="fa-solid fa-circle-check"></i> Delivered
+          </span>
+        )}
       </h4>
       <div ref={mapRef} className="tracking-map"></div>
-      <p className="tracking-map-label">
-        <i className="fa-solid fa-circle-dot" style={{ color: 'var(--orange)' }}></i>
-        {label}
-      </p>
+      <div className="tracking-map-legend">
+        {originLat && (
+          <>
+            <span><span className="legend-dot origin"></span> Origin</span>
+            <span><span className="legend-dot dest"></span> Destination</span>
+            <span><span className="legend-dot pkg"></span> Package</span>
+          </>
+        )}
+        <span className="tracking-map-label-text">
+          <i className="fa-solid fa-circle-dot" style={{ color: 'var(--orange)' }}></i> {label}
+        </span>
+      </div>
     </div>
   );
 }
