@@ -40,7 +40,7 @@ export default function Footer() {
       </div>
       <div className="footer-bottom">
         <div className="container">
-          <p>© 2026 FedEx Tracker Clone. Built for demonstration purposes only.</p>
+          <p>© 2026 FedEx Tracker. Built for tracking packages.</p>
           <div className="footer-bottom-links">
             <a href="#">Privacy Policy</a>
             <a href="#">Terms of Use</a>
