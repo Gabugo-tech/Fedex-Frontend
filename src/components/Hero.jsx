@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function Hero({ onTrack, loading, error }) {
   const [input, setInput]           = useState('');
   const [activeTab, setActiveTab]   = useState('track');
   const [inputError, setInputError] = useState(false);
+  // Fix #10: use a ref to scroll after results are rendered
+  const didTrackRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && didTrackRef.current) {
+      didTrackRef.current = false;
+      const el = document.getElementById('results-anchor');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [loading]);
 
   function handleTrack() {
     if (!input.trim()) {
@@ -11,10 +21,8 @@ export default function Hero({ onTrack, loading, error }) {
       setTimeout(() => setInputError(false), 1500);
       return;
     }
+    didTrackRef.current = true;
     onTrack(input);
-    setTimeout(() => {
-      document.getElementById('results-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 200);
   }
 
   function handleKey(e) {

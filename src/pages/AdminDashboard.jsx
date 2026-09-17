@@ -17,7 +17,7 @@ const STATUSES = [
 const EMPTY_SHIPMENT = {
   tracking_number: '', status: 'in-transit', status_label: 'In Transit',
   status_icon: 'fa-plane', service: '', weight: '', origin: '', destination: '',
-  current_location: '', estimated_delivery: '', delivered_at: '',
+  current_location: '', estimated_delivery: '', delivered_at: null,
   recipient: '', progress_step: 1, map_lat: '', map_lng: '',
 };
 
@@ -26,7 +26,7 @@ const makeEmptyEvent = () => ({
   status: '', location: '', event_time: new Date().toISOString().slice(0, 16), is_latest: false,
 });
 
-export default function AdminDashboard({ session, onLogout }) {
+export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const token = session?.access_token;
 
   const [shipments, setShipments]       = useState([]);
@@ -117,7 +117,7 @@ export default function AdminDashboard({ session, onLogout }) {
       destination: shipment.destination || '',
       current_location: shipment.current_location || '',
       estimated_delivery: shipment.estimated_delivery || '',
-      delivered_at: shipment.delivered_at || '',
+      delivered_at: shipment.delivered_at || null,
       recipient: shipment.recipient || '',
       progress_step: shipment.progress_step || 0,
       map_lat: shipment.map_lat || '',
@@ -199,11 +199,13 @@ export default function AdminDashboard({ session, onLogout }) {
           <span className="admin-user-email">
             <i className="fa-solid fa-user-shield"></i> {session?.user?.email}
           </span>
-          <button className="btn-logout" onClick={handleLogout}>
-            <i className="fa-solid fa-right-from-bracket"></i> Logout
-          </button>
-          <button className="admin-back-link" onClick={onLogout}>
+          {/* Fix #6: back-to-site keeps session alive, logout clears it */}
+          <button className="btn-admin-secondary" style={{ fontSize: '13px', padding: '8px 14px' }}
+            onClick={onBackToSite}>
             <i className="fa-solid fa-arrow-left"></i> Back to site
+          </button>
+          <button className="btn-logout" onClick={handleLogout}>
+            <i className="fa-solid fa-right-from-bracket"></i> Sign Out
           </button>
         </div>
       </aside>
@@ -488,8 +490,8 @@ export default function AdminDashboard({ session, onLogout }) {
                   <div className="form-group">
                     <label>Delivered At (if delivered)</label>
                     <input type="datetime-local"
-                      value={form.delivered_at}
-                      onChange={e => setForm(f => ({ ...f, delivered_at: e.target.value }))} />
+                      value={form.delivered_at || ''}
+                      onChange={e => setForm(f => ({ ...f, delivered_at: e.target.value || null }))} />
                   </div>
                   <div className="form-group">
                     <label>Recipient</label>

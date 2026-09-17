@@ -19,6 +19,8 @@ export default function App() {
   const [hasSearched, setHasSearched]   = useState(false);
   const [adminSession, setAdminSession] = useState(null);
   const [showSignIn, setShowSignIn]     = useState(false);
+  // Fix #5: track session restoration so we don't flash the public site
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   // On mount: restore existing session
   useEffect(() => {
@@ -26,7 +28,8 @@ export default function App() {
       if (session && session.user.email === ADMIN_EMAIL) {
         setAdminSession(session);
       }
-    });
+      setSessionChecked(true); // always mark as checked
+    }).catch(() => setSessionChecked(true));
   }, []);
 
   async function handleTrack(numbersRaw) {
@@ -62,12 +65,22 @@ export default function App() {
     setHasSearched(false);
   }
 
+  // Fix #5: show nothing until session check completes (prevents flash)
+  if (!sessionChecked) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
   // Admin is logged in — show full dashboard
   if (adminSession) {
     return (
       <AdminDashboard
         session={adminSession}
         onLogout={handleSignOut}
+        onBackToSite={() => setAdminSession(null)} // Fix #6: separate back from logout
       />
     );
   }
@@ -75,8 +88,9 @@ export default function App() {
   // Public site
   return (
     <>
+      {/* Fix #1: pass real user object instead of null */}
       <Header
-        user={null}
+        user={adminSession ? adminSession.user : null}
         onSignInClick={() => setShowSignIn(true)}
         onSignOut={handleSignOut}
       />

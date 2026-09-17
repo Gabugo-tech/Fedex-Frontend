@@ -13,23 +13,33 @@ export default function ResultsSection({ results, loading, onClear }) {
   return (
     <section className="results-section" id="results-anchor">
       <div className="container">
-        <div className="results-header">
-          <h2>Tracking Results</h2>
-          <button className="btn-outline" onClick={onClear}>
-            <i className="fa-solid fa-xmark"></i> Clear
-          </button>
-        </div>
+
+        {/* Fix #9: only show header once results are ready, not during loading */}
+        {!loading && (
+          <div className="results-header">
+            <h2>Tracking Results</h2>
+            <button className="btn-outline" onClick={onClear}>
+              <i className="fa-solid fa-xmark"></i> Clear
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="spinner-wrap">
             <div className="spinner"></div>
-            <p style={{ color: '#aaa', fontSize: '14px' }}>Looking up your tracking number...</p>
+            <p style={{ color: '#aaa', fontSize: '14px' }}>
+              Looking up your tracking number…
+            </p>
+            <p style={{ color: '#bbb', fontSize: '12px', marginTop: '6px' }}>
+              If this is taking a while, the server may be waking up. Please wait.
+            </p>
           </div>
         ) : (
-          results.map((result, i) =>
+          /* Fix #3: use tracking_number as key instead of array index */
+          results.map(result =>
             result.found
-              ? <ResultCard key={i} result={result} steps={PROGRESS_STEPS} />
-              : <NotFound key={i} trackingNumber={result.tracking_number} />
+              ? <ResultCard key={result.tracking_number} result={result} steps={PROGRESS_STEPS} />
+              : <NotFound key={result.tracking_number} trackingNumber={result.tracking_number} />
           )
         )}
       </div>

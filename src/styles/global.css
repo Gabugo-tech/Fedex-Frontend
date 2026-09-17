@@ -550,6 +550,8 @@ a:hover { color: var(--orange); }
 .tracking-cell { font-weight: 700; letter-spacing: 0.5px; font-size: 13px; }
 .pin-set { color: var(--green); font-weight: 600; font-size: 13px; }
 .pin-unset { color: var(--gray-400); font-size: 13px; }
+/* Fix #8: missing map-pin-cell column styles */
+.map-pin-cell { white-space: nowrap; }
 .actions-cell { display: flex; gap: 8px; }
 
 .btn-icon {
