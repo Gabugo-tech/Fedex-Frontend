@@ -12,9 +12,11 @@ const STATUS_CLASS = {
 export default function ResultCard({ result, steps }) {
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
+  const hasMap = result.map_lat && result.map_lng;
 
   return (
     <div className="result-card">
+
       {/* Header */}
       <div className="result-card-header">
         <div>
@@ -59,12 +61,17 @@ export default function ResultCard({ result, steps }) {
         )}
       </div>
 
-      {/* Live Map */}
-      {result.map_lat && result.map_lng && (
+      {/* Live Map — shown first, prominently */}
+      {hasMap && (
         <TrackingMap
           lat={parseFloat(result.map_lat)}
           lng={parseFloat(result.map_lng)}
           label={result.current_location}
+          originLat={result.origin_lat ? parseFloat(result.origin_lat) : null}
+          originLng={result.origin_lng ? parseFloat(result.origin_lng) : null}
+          destLat={result.dest_lat ? parseFloat(result.dest_lat) : null}
+          destLng={result.dest_lng ? parseFloat(result.dest_lng) : null}
+          status={result.status}
         />
       )}
 
@@ -104,6 +111,7 @@ export default function ResultCard({ result, steps }) {
           ))}
         </div>
       </div>
+
     </div>
   );
 }

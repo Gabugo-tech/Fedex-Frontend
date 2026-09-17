@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ResultsSection from './components/ResultsSection';
-import Features from './components/Features';
-import Services from './components/Services';
 import Footer from './components/Footer';
 import AdminDashboard from './pages/AdminDashboard';
 import SignInModal from './components/SignInModal';
@@ -20,14 +18,11 @@ export default function App() {
   const [adminSession, setAdminSession] = useState(null);
   const [showSignIn, setShowSignIn]     = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
-  // Fix #7: track whether admin chose "back to site" without logging out
   const [backedToSite, setBackedToSite] = useState(false);
 
-  // On mount: restore existing session
   useEffect(() => {
     getSession().then(session => {
       if (session && session.user.email === ADMIN_EMAIL) {
-        // Fix #7: only auto-restore dashboard if admin hasn't explicitly backed to site
         if (!backedToSite) setAdminSession(session);
       }
       setSessionChecked(true);
@@ -69,13 +64,11 @@ export default function App() {
     setHasSearched(false);
   }
 
-  // Fix #7: back to site keeps Supabase session alive, just hides dashboard
   function handleBackToSite() {
     setAdminSession(null);
     setBackedToSite(true);
   }
 
-  // Show spinner until session check completes
   if (!sessionChecked) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -84,7 +77,6 @@ export default function App() {
     );
   }
 
-  // Admin is logged in — show full dashboard
   if (adminSession) {
     return (
       <AdminDashboard
@@ -95,13 +87,11 @@ export default function App() {
     );
   }
 
-  // Public site — Fix #1: pass real user when backed-to-site session still alive
   return (
     <>
       <Header
         user={backedToSite ? { email: ADMIN_EMAIL } : null}
         onSignInClick={() => {
-          // Fix #7: if session still alive, go straight back to dashboard
           if (backedToSite) {
             getSession().then(session => {
               if (session) { setAdminSession(session); setBackedToSite(false); }
@@ -112,7 +102,6 @@ export default function App() {
           }
         }}
         onSignOut={handleSignOut}
-        // Fix #7: show "Go to Dashboard" button when backed-to-site
         onGoToDashboard={backedToSite ? () => {
           getSession().then(session => {
             if (session) { setAdminSession(session); setBackedToSite(false); }
@@ -123,8 +112,6 @@ export default function App() {
       {hasSearched && (
         <ResultsSection results={results} loading={loading} onClear={handleClear} />
       )}
-      <Features />
-      <Services />
       <Footer />
 
       {showSignIn && (

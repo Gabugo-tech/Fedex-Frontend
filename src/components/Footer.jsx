@@ -10,41 +10,50 @@ export default function Footer() {
           </div>
           <p>Delivering possibilities around the world.</p>
           <div className="social-links">
-            <a href="#" aria-label="Facebook"><i className="fa-brands fa-facebook"></i></a>
-            <a href="#" aria-label="X / Twitter"><i className="fa-brands fa-x-twitter"></i></a>
-            <a href="#" aria-label="Instagram"><i className="fa-brands fa-instagram"></i></a>
-            <a href="#" aria-label="LinkedIn"><i className="fa-brands fa-linkedin"></i></a>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+              <i className="fa-brands fa-facebook"></i>
+            </a>
+            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="X / Twitter">
+              <i className="fa-brands fa-x-twitter"></i>
+            </a>
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+              <i className="fa-brands fa-instagram"></i>
+            </a>
+            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+              <i className="fa-brands fa-linkedin"></i>
+            </a>
           </div>
         </div>
-        <div className="footer-links">
-          <h5>Shipping</h5>
-          <a href="#">Create Shipment</a>
-          <a href="#">Schedule Pickup</a>
-          <a href="#">Packaging Guide</a>
-          <a href="#">Rates &amp; Fees</a>
-        </div>
+
         <div className="footer-links">
           <h5>Tracking</h5>
-          <a href="#">Track a Package</a>
-          <a href="#">Manage Delivery</a>
-          <a href="#">Proof of Delivery</a>
-          <a href="#">Notifications</a>
+          <a href="/">Track a Package</a>
+          <a href="/">Proof of Delivery</a>
+          <a href="/">Notifications</a>
         </div>
+
+        <div className="footer-links">
+          <h5>Services</h5>
+          <a href="/">FedEx Express</a>
+          <a href="/">FedEx Ground</a>
+          <a href="/">FedEx International</a>
+        </div>
+
         <div className="footer-links">
           <h5>Support</h5>
-          <a href="#">Contact Us</a>
-          <a href="#">FAQs</a>
-          <a href="#">Claim a Package</a>
-          <a href="#">Service Alerts</a>
+          <a href="mailto:support@fedex.com">Contact Us</a>
+          <a href="/">FAQs</a>
+          <a href="/">Service Alerts</a>
         </div>
       </div>
+
       <div className="footer-bottom">
         <div className="container">
-          <p>© 2026 FedEx Tracker. Built for tracking packages.</p>
+          <p>© {new Date().getFullYear()} FedEx Tracker. All rights reserved.</p>
           <div className="footer-bottom-links">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Use</a>
-            <a href="#">Accessibility</a>
+            <a href="/">Privacy Policy</a>
+            <a href="/">Terms of Use</a>
+            <a href="/">Accessibility</a>
           </div>
         </div>
       </div>

@@ -18,7 +18,10 @@ const EMPTY_SHIPMENT = {
   tracking_number: '', status: 'in-transit', status_label: 'In Transit',
   status_icon: 'fa-plane', service: '', weight: '', origin: '', destination: '',
   current_location: '', estimated_delivery: '', delivered_at: null,
-  recipient: '', progress_step: 1, map_lat: '', map_lng: '',
+  recipient: '', progress_step: 1,
+  map_lat: '', map_lng: '',
+  origin_lat: '', origin_lng: '',
+  dest_lat: '',   dest_lng: '',
 };
 
 // Factory function so the timestamp is fresh each time it's called
@@ -107,21 +110,25 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
 
   function handleEdit(shipment) {
     setForm({
-      tracking_number: shipment.tracking_number,
-      status: shipment.status,
-      status_label: shipment.status_label,
-      status_icon: shipment.status_icon,
-      service: shipment.service || '',
-      weight: shipment.weight || '',
-      origin: shipment.origin || '',
-      destination: shipment.destination || '',
-      current_location: shipment.current_location || '',
+      tracking_number:    shipment.tracking_number,
+      status:             shipment.status,
+      status_label:       shipment.status_label,
+      status_icon:        shipment.status_icon,
+      service:            shipment.service || '',
+      weight:             shipment.weight || '',
+      origin:             shipment.origin || '',
+      destination:        shipment.destination || '',
+      current_location:   shipment.current_location || '',
       estimated_delivery: shipment.estimated_delivery || '',
-      delivered_at: shipment.delivered_at || null,
-      recipient: shipment.recipient || '',
-      progress_step: shipment.progress_step || 0,
-      map_lat: shipment.map_lat || '',
-      map_lng: shipment.map_lng || '',
+      delivered_at:       shipment.delivered_at || null,
+      recipient:          shipment.recipient || '',
+      progress_step:      shipment.progress_step || 0,
+      map_lat:            shipment.map_lat    || '',
+      map_lng:            shipment.map_lng    || '',
+      origin_lat:         shipment.origin_lat || '',
+      origin_lng:         shipment.origin_lng || '',
+      dest_lat:           shipment.dest_lat   || '',
+      dest_lng:           shipment.dest_lng   || '',
     });
     setEditingShipment(shipment);
     setActiveTab('create');
@@ -171,6 +178,10 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   function handleMapPick(lat, lng) {
     if (mapPickerTarget === 'form') {
       setForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
+    } else if (mapPickerTarget === 'origin') {
+      setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
+    } else if (mapPickerTarget === 'dest') {
+      setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
     } else {
       setLocationForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
     }
@@ -503,13 +514,13 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Map Latitude</label>
+                    <label>Map Latitude (current position)</label>
                     <input type="number" step="any" placeholder="e.g. 40.7128"
                       value={form.map_lat}
                       onChange={e => setForm(f => ({ ...f, map_lat: e.target.value }))} />
                   </div>
                   <div className="form-group">
-                    <label>Map Longitude</label>
+                    <label>Map Longitude (current position)</label>
                     <input type="number" step="any" placeholder="e.g. -74.0060"
                       value={form.map_lng}
                       onChange={e => setForm(f => ({ ...f, map_lng: e.target.value }))} />
@@ -518,8 +529,53 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                 <div style={{ marginBottom: '16px' }}>
                   <button type="button" className="btn-admin-secondary"
                     onClick={() => { setMapPickerTarget('form'); setShowMapPicker(true); }}>
-                    <i className="fa-solid fa-map"></i> Pick Location on Map
+                    <i className="fa-solid fa-map"></i> Pick Current Location on Map
                   </button>
+                </div>
+
+                <div className="admin-coord-section">
+                  <h4><i className="fa-solid fa-route"></i> Route Coordinates (for animated map)</h4>
+                  <p className="admin-card-desc">Set origin and destination coordinates so the map animates the package moving along the route.</p>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Origin Latitude</label>
+                      <input type="number" step="any" placeholder="e.g. 34.0522"
+                        value={form.origin_lat}
+                        onChange={e => setForm(f => ({ ...f, origin_lat: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Origin Longitude</label>
+                      <input type="number" step="any" placeholder="e.g. -118.2437"
+                        value={form.origin_lng}
+                        onChange={e => setForm(f => ({ ...f, origin_lng: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <button type="button" className="btn-admin-secondary"
+                      onClick={() => { setMapPickerTarget('origin'); setShowMapPicker(true); }}>
+                      <i className="fa-solid fa-map-pin"></i> Pick Origin on Map
+                    </button>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Destination Latitude</label>
+                      <input type="number" step="any" placeholder="e.g. 40.7128"
+                        value={form.dest_lat}
+                        onChange={e => setForm(f => ({ ...f, dest_lat: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Destination Longitude</label>
+                      <input type="number" step="any" placeholder="e.g. -74.0060"
+                        value={form.dest_lng}
+                        onChange={e => setForm(f => ({ ...f, dest_lng: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <button type="button" className="btn-admin-secondary"
+                      onClick={() => { setMapPickerTarget('dest'); setShowMapPicker(true); }}>
+                      <i className="fa-solid fa-flag-checkered"></i> Pick Destination on Map
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-actions">
