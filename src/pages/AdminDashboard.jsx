@@ -1,230 +1,281 @@
 import React, { useState, useEffect } from 'react';
-import React, { useState, useEffect } from 'react';
 import { signOut } from '../api/auth';
 import {
-  getShipments, deleteShipment, updateLocation, addEvent, deleteEvent,
-  createShipment, updateShipment, getShipment,
+  getShipments, deleteShipment, updateLocation,
+  addEvent, deleteEvent, createShipment, updateShipment, getShipment,
 } from '../api/admin';
 import AdminMapPicker from '../components/AdminMapPicker';
 import { generateTrackingNumber } from '../utils/generateTrackingNumber';
 
+// Status → progress step mapping (auto, no manual input needed)
 const STATUSES = [
-  { value: 'pending',      label: 'Pending',          icon: 'fa-clock' },
-  { value: 'in-transit',   label: 'In Transit',        icon: 'fa-plane' },
-  { value: 'out-delivery', label: 'Out for Delivery',  icon: 'fa-truck' },
-  { value: 'delivered',    label: 'Delivered',          icon: 'fa-circle-check' },
-  { value: 'exception',    label: 'Exception',          icon: 'fa-triangle-exclamation' },
+  { value: 'pending',      label: 'Pending',         icon: 'fa-clock',                step: 0 },
+  { value: 'in-transit',   label: 'In Transit',       icon: 'fa-plane',                step: 2 },
+  { value: 'out-delivery', label: 'Out for Delivery', icon: 'fa-truck',                step: 3 },
+  { value: 'delivered',    label: 'Delivered',        icon: 'fa-circle-check',          step: 4 },
+  { value: 'exception',    label: 'Exception',        icon: 'fa-triangle-exclamation',  step: 1 },
 ];
 
-const EMPTY_SHIPMENT = {
-  tracking_number: '', status: 'in-transit', status_label: 'In Transit',
-  status_icon: 'fa-plane', service: '', weight: '', origin: '', destination: '',
-  current_location: '', estimated_delivery: '', delivered_at: null,
-  recipient: '', progress_step: 1,
+const EMPTY_FORM = {
+  tracking_number: '', service: 'GBT Express',
+  status: 'in-transit', status_label: 'In Transit',
+  status_icon: 'fa-plane', progress_step: 2,
+  origin: '', destination: '', current_location: '',
+  weight: '', estimated_delivery: '',
+  delivered_at: null, recipient: '',
   map_lat: '', map_lng: '',
   origin_lat: '', origin_lng: '',
-  dest_lat: '',   dest_lng: '',
+  dest_lat: '',  dest_lng: '',
 };
 
-// Factory function so the timestamp is fresh each time it's called
 const makeEmptyEvent = () => ({
-  status: '', location: '', event_time: new Date().toISOString().slice(0, 16), is_latest: false,
+  status: '', location: '',
+  event_time: new Date().toISOString().slice(0, 16),
+  is_latest: false,
 });
 
 export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const token = session?.access_token;
 
-  const [shipments, setShipments]       = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [activeTab, setActiveTab]       = useState('shipments'); // 'shipments' | 'create'
+  const [shipments, setShipments]             = useState([]);
+  const [loading, setLoading]                 = useState(true);
+  const [view, setView]                       = useState('list');   // 'list' | 'form'
   const [editingShipment, setEditingShipment] = useState(null);
-  const [selectedShipment, setSelectedShipment] = useState(null);
-  const [shipmentDetail, setShipmentDetail] = useState(null);
-  const [form, setForm]                 = useState(EMPTY_SHIPMENT);
-  const [eventForm, setEventForm]       = useState(makeEmptyEvent);
-  const [locationForm, setLocationForm] = useState({ map_lat: '', map_lng: '', current_location: '' });
-  const [saving, setSaving]             = useState(false);
-  const [toast, setToast]               = useState(null);
-  const [showMapPicker, setShowMapPicker] = useState(false);
-  const [mapPickerTarget, setMapPickerTarget] = useState(null); // 'form' | 'location'
+  const [expandedId, setExpandedId]           = useState(null);
+  const [expandedData, setExpandedData]       = useState(null);
+  const [form, setForm]                       = useState(EMPTY_FORM);
+  const [eventForm, setEventForm]             = useState(makeEmptyEvent);
+  const [locationForm, setLocationForm]       = useState({ map_lat: '', map_lng: '', current_location: '' });
+  const [saving, setSaving]                   = useState(false);
+  const [toast, setToast]                     = useState(null);
+  const [mapPicker, setMapPicker]             = useState(null); // null | 'current' | 'origin' | 'dest' | 'location'
+  const [sidebarOpen, setSidebarOpen]         = useState(false);
 
   useEffect(() => { loadShipments(); }, []);
 
+  // ── DATA ──────────────────────────────────────────────
   async function loadShipments() {
     setLoading(true);
     try {
       const data = await getShipments(token);
       setShipments(data.shipments);
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { toast_show(e.message, 'error'); }
     finally { setLoading(false); }
   }
 
-  async function loadShipmentDetail(id) {
+  async function loadExpanded(id) {
     try {
       const data = await getShipment(id, token);
-      setShipmentDetail(data);
+      setExpandedData(data);
       setLocationForm({
         map_lat: data.shipment.map_lat || '',
         map_lng: data.shipment.map_lng || '',
         current_location: data.shipment.current_location || '',
       });
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { toast_show(e.message, 'error'); }
   }
 
-  function showToast(msg, type = 'success') {
+  // ── TOAST ─────────────────────────────────────────────
+  function toast_show(msg, type = 'success') {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   }
 
+  // ── STATUS CHANGE — auto-sets progress step ───────────
   function handleStatusChange(val) {
     const s = STATUSES.find(s => s.value === val);
-    setForm(f => ({ ...f, status: val, status_label: s?.label || val, status_icon: s?.icon || 'fa-box' }));
+    setForm(f => ({
+      ...f,
+      status:        val,
+      status_label:  s?.label    || val,
+      status_icon:   s?.icon     || 'fa-box',
+      progress_step: s?.step     ?? f.progress_step,
+    }));
   }
 
-  async function handleSaveShipment(e) {
+  // ── SAVE SHIPMENT ─────────────────────────────────────
+  async function handleSave(e) {
     e.preventDefault();
     setSaving(true);
     try {
       if (editingShipment) {
         await updateShipment(editingShipment.id, form, token);
-        showToast('Shipment updated successfully');
+        toast_show('Shipment updated');
       } else {
         await createShipment(form, token);
-        showToast('Shipment created successfully');
+        toast_show('Shipment created');
       }
-      setForm(EMPTY_SHIPMENT);
-      setEditingShipment(null);
-      setActiveTab('shipments');
+      goToList();
       loadShipments();
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { toast_show(e.message, 'error'); }
     finally { setSaving(false); }
   }
 
+  // ── DELETE ────────────────────────────────────────────
   async function handleDelete(id) {
     if (!window.confirm('Delete this shipment? This cannot be undone.')) return;
     try {
       await deleteShipment(id, token);
-      showToast('Shipment deleted');
-      if (selectedShipment?.id === id) { setSelectedShipment(null); setShipmentDetail(null); }
+      toast_show('Shipment deleted');
+      if (expandedId === id) { setExpandedId(null); setExpandedData(null); }
       loadShipments();
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { toast_show(e.message, 'error'); }
   }
 
-  function handleEdit(shipment) {
+  // ── EDIT ──────────────────────────────────────────────
+  function handleEdit(s) {
     setForm({
-      tracking_number:    shipment.tracking_number,
-      status:             shipment.status,
-      status_label:       shipment.status_label,
-      status_icon:        shipment.status_icon,
-      service:            shipment.service || '',
-      weight:             shipment.weight || '',
-      origin:             shipment.origin || '',
-      destination:        shipment.destination || '',
-      current_location:   shipment.current_location || '',
-      estimated_delivery: shipment.estimated_delivery || '',
-      delivered_at:       shipment.delivered_at || null,
-      recipient:          shipment.recipient || '',
-      progress_step:      shipment.progress_step || 0,
-      map_lat:            shipment.map_lat    || '',
-      map_lng:            shipment.map_lng    || '',
-      origin_lat:         shipment.origin_lat || '',
-      origin_lng:         shipment.origin_lng || '',
-      dest_lat:           shipment.dest_lat   || '',
-      dest_lng:           shipment.dest_lng   || '',
+      tracking_number: s.tracking_number,
+      service:         s.service || '',
+      status:          s.status,
+      status_label:    s.status_label,
+      status_icon:     s.status_icon,
+      progress_step:   s.progress_step || 0,
+      origin:          s.origin || '',
+      destination:     s.destination || '',
+      current_location:s.current_location || '',
+      weight:          s.weight || '',
+      estimated_delivery: s.estimated_delivery || '',
+      delivered_at:    s.delivered_at || null,
+      recipient:       s.recipient || '',
+      map_lat:         s.map_lat    || '',
+      map_lng:         s.map_lng    || '',
+      origin_lat:      s.origin_lat || '',
+      origin_lng:      s.origin_lng || '',
+      dest_lat:        s.dest_lat   || '',
+      dest_lng:        s.dest_lng   || '',
     });
-    setEditingShipment(shipment);
-    setActiveTab('create');
+    setEditingShipment(s);
+    setView('form');
   }
 
+  // ── TOGGLE EXPAND ROW ─────────────────────────────────
+  function handleExpand(s) {
+    if (expandedId === s.id) {
+      setExpandedId(null);
+      setExpandedData(null);
+    } else {
+      setExpandedId(s.id);
+      loadExpanded(s.id);
+    }
+  }
+
+  // ── UPDATE LOCATION ───────────────────────────────────
   async function handleUpdateLocation(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateLocation(selectedShipment.id, locationForm, token);
-      showToast('Location updated on map');
-      loadShipmentDetail(selectedShipment.id);
+      await updateLocation(expandedId, locationForm, token);
+      toast_show('Live location updated');
+      loadExpanded(expandedId);
       loadShipments();
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { toast_show(e.message, 'error'); }
     finally { setSaving(false); }
   }
 
+  // ── ADD EVENT ─────────────────────────────────────────
   async function handleAddEvent(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      await addEvent(selectedShipment.id, {
+      await addEvent(expandedId, {
         ...eventForm,
         event_time: new Date(eventForm.event_time).toISOString(),
       }, token);
-      showToast('Event added');
+      toast_show('Event added');
       setEventForm(makeEmptyEvent());
-      loadShipmentDetail(selectedShipment.id);
-    } catch (e) { showToast(e.message, 'error'); }
+      loadExpanded(expandedId);
+    } catch (e) { toast_show(e.message, 'error'); }
     finally { setSaving(false); }
   }
 
+  // ── DELETE EVENT ──────────────────────────────────────
   async function handleDeleteEvent(id) {
     if (!window.confirm('Delete this event?')) return;
     try {
       await deleteEvent(id, token);
-      showToast('Event deleted');
-      loadShipmentDetail(selectedShipment.id);
-    } catch (e) { showToast(e.message, 'error'); }
+      toast_show('Event deleted');
+      loadExpanded(expandedId);
+    } catch (e) { toast_show(e.message, 'error'); }
   }
 
-  async function handleLogout() {
-    await signOut();
-    onLogout();
-  }
-
+  // ── MAP PICKER ────────────────────────────────────────
   function handleMapPick(lat, lng) {
-    if (mapPickerTarget === 'form') {
-      setForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
-    } else if (mapPickerTarget === 'origin') {
-      setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
-    } else if (mapPickerTarget === 'dest') {
-      setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
-    } else {
-      setLocationForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
-    }
-    setShowMapPicker(false);
+    if (mapPicker === 'current')  setForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
+    if (mapPicker === 'origin')   setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
+    if (mapPicker === 'dest')     setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
+    if (mapPicker === 'location') setLocationForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
+    setMapPicker(null);
   }
+
+  // ── NAV ───────────────────────────────────────────────
+  function goToList() {
+    setView('list');
+    setEditingShipment(null);
+    setForm(EMPTY_FORM);
+    setSidebarOpen(false);
+  }
+
+  function goToCreate() {
+    setEditingShipment(null);
+    setForm(EMPTY_FORM);
+    setView('form');
+    setSidebarOpen(false);
+  }
+
+  // ── RENDER ────────────────────────────────────────────
+  const shipmentForPicker = expandedData?.shipment;
 
   return (
     <div className="admin-layout">
-      {/* SIDEBAR */}
-      <aside className="admin-sidebar">
+
+      {/* ── SIDEBAR ── */}
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="admin-logo">
           <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
           <span className="admin-badge">Admin</span>
         </div>
+
         <nav className="admin-nav">
-          <button className={activeTab === 'shipments' ? 'active' : ''}
-            onClick={() => { setActiveTab('shipments'); setEditingShipment(null); setForm(EMPTY_SHIPMENT); }}>
-            <i className="fa-solid fa-boxes-stacked"></i> Shipments
+          <button className={view === 'list' ? 'active' : ''} onClick={goToList}>
+            <i className="fa-solid fa-list"></i> All Shipments
           </button>
-          <button className={activeTab === 'create' ? 'active' : ''}
-            onClick={() => { setActiveTab('create'); setEditingShipment(null); setForm(EMPTY_SHIPMENT); }}>
-            <i className="fa-solid fa-plus"></i> {editingShipment ? 'Edit Shipment' : 'New Shipment'}
+          <button className={view === 'form' && !editingShipment ? 'active' : ''} onClick={goToCreate}>
+            <i className="fa-solid fa-plus"></i> New Shipment
           </button>
         </nav>
+
         <div className="admin-sidebar-footer">
-          <span className="admin-user-email">
-            <i className="fa-solid fa-user-shield"></i> {session?.user?.email}
-          </span>
-          {/* Fix #6: back-to-site keeps session alive, logout clears it */}
-          <button className="btn-admin-secondary" style={{ fontSize: '13px', padding: '8px 14px' }}
-            onClick={onBackToSite}>
+          <div className="admin-user-email">
+            <i className="fa-solid fa-user-shield"></i>
+            <span>{session?.user?.email}</span>
+          </div>
+          <button className="btn-sidebar-action" onClick={onBackToSite}>
             <i className="fa-solid fa-arrow-left"></i> Back to site
           </button>
-          <button className="btn-logout" onClick={handleLogout}>
+          <button className="btn-logout" onClick={async () => { await signOut(); onLogout(); }}>
             <i className="fa-solid fa-right-from-bracket"></i> Sign Out
           </button>
         </div>
       </aside>
 
-      {/* MAIN */}
+      {/* ── MOBILE HEADER ── */}
+      <div className="admin-mobile-header">
+        <button className="admin-hamburger" onClick={() => setSidebarOpen(o => !o)}>
+          <i className={`fa-solid ${sidebarOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
+        </button>
+        <div className="logo" style={{ fontSize: '22px', fontWeight: 900 }}>
+          <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+        </div>
+        <button className="btn-admin-primary" style={{ padding: '7px 14px', fontSize: '13px' }} onClick={goToCreate}>
+          <i className="fa-solid fa-plus"></i> New
+        </button>
+      </div>
+
+      {/* ── MAIN ── */}
       <main className="admin-main">
+
+        {/* Toast */}
         {toast && (
           <div className={`admin-toast ${toast.type}`}>
             <i className={`fa-solid ${toast.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check'}`}></i>
@@ -232,13 +283,19 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
           </div>
         )}
 
-        {/* ===== SHIPMENTS LIST ===== */}
-        {activeTab === 'shipments' && (
+        {/* ════════════════════════════════
+            VIEW: SHIPMENTS LIST
+        ════════════════════════════════ */}
+        {view === 'list' && (
           <div className="admin-section">
             <div className="admin-section-header">
-              <h1><i className="fa-solid fa-boxes-stacked"></i> All Shipments</h1>
-              <button className="btn-admin-primary"
-                onClick={() => { setActiveTab('create'); setEditingShipment(null); setForm(EMPTY_SHIPMENT); }}>
+              <div>
+                <h1><i className="fa-solid fa-boxes-stacked"></i> Shipments</h1>
+                <p className="admin-section-sub">
+                  {shipments.length} shipment{shipments.length !== 1 ? 's' : ''} total
+                </p>
+              </div>
+              <button className="btn-admin-primary" onClick={goToCreate}>
                 <i className="fa-solid fa-plus"></i> New Shipment
               </button>
             </div>
@@ -248,194 +305,220 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
             ) : shipments.length === 0 ? (
               <div className="admin-empty">
                 <i className="fa-solid fa-box-open"></i>
-                <p>No shipments yet. Create your first one.</p>
+                <p>No shipments yet.</p>
+                <button className="btn-admin-primary" style={{ marginTop: '16px' }} onClick={goToCreate}>
+                  <i className="fa-solid fa-plus"></i> Create your first shipment
+                </button>
               </div>
             ) : (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Tracking #</th>
-                      <th>Status</th>
-                      <th>Service</th>
-                      <th>Destination</th>
-                      <th>Map Pin</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shipments.map(s => (
-                      <tr key={s.id} className={selectedShipment?.id === s.id ? 'selected' : ''}>
-                        <td className="tracking-cell">{s.tracking_number}</td>
-                        <td>
-                          <span className={`status-badge ${s.status}`}>
-                            <i className={`fa-solid ${s.status_icon}`}></i> {s.status_label}
-                          </span>
-                        </td>
-                        <td>{s.service}</td>
-                        <td>{s.destination}</td>
-                        <td className="map-pin-cell">
-                          {s.map_lat && s.map_lng
-                            ? <span className="pin-set"><i className="fa-solid fa-location-dot"></i> Set</span>
-                            : <span className="pin-unset"><i className="fa-regular fa-circle"></i> Not set</span>
-                          }
-                        </td>
-                        <td className="actions-cell">
-                          <button className="btn-icon btn-view" title="Manage"
-                            onClick={() => {
-                              setSelectedShipment(s);
-                              loadShipmentDetail(s.id);
-                            }}>
-                            <i className="fa-solid fa-sliders"></i>
-                          </button>
-                          <button className="btn-icon btn-edit" title="Edit"
-                            onClick={() => handleEdit(s)}>
-                            <i className="fa-solid fa-pen"></i>
-                          </button>
-                          <button className="btn-icon btn-delete" title="Delete"
-                            onClick={() => handleDelete(s.id)}>
-                            <i className="fa-solid fa-trash"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <div className="shipment-list">
+                {shipments.map(s => (
+                  <div key={s.id} className={`shipment-row-wrap ${expandedId === s.id ? 'expanded' : ''}`}>
 
-            {/* SHIPMENT DETAIL PANEL */}
-            {selectedShipment && shipmentDetail && (
-              <div className="admin-detail-panel">
-                <div className="admin-detail-header">
-                  <h2><i className="fa-solid fa-sliders"></i> Manage: {selectedShipment.tracking_number}</h2>
-                  <button className="btn-icon btn-close" onClick={() => { setSelectedShipment(null); setShipmentDetail(null); }}>
-                    <i className="fa-solid fa-xmark"></i>
-                  </button>
-                </div>
-
-                {/* UPDATE MAP LOCATION */}
-                <div className="admin-card">
-                  <h3><i className="fa-solid fa-location-dot"></i> Live Map Location</h3>
-                  <p className="admin-card-desc">Update the pin shown on the live map for this shipment.</p>
-                  <form onSubmit={handleUpdateLocation} className="location-form">
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Latitude</label>
-                        <input type="number" step="any" placeholder="e.g. 40.7128"
-                          value={locationForm.map_lat}
-                          onChange={e => setLocationForm(f => ({ ...f, map_lat: e.target.value }))} />
-                      </div>
-                      <div className="form-group">
-                        <label>Longitude</label>
-                        <input type="number" step="any" placeholder="e.g. -74.0060"
-                          value={locationForm.map_lng}
-                          onChange={e => setLocationForm(f => ({ ...f, map_lng: e.target.value }))} />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label>Current Location Label</label>
-                      <input type="text" placeholder="e.g. New York, NY — Delivered"
-                        value={locationForm.current_location}
-                        onChange={e => setLocationForm(f => ({ ...f, current_location: e.target.value }))} />
-                    </div>
-                    <div className="form-actions">
-                      <button type="button" className="btn-admin-secondary"
-                        onClick={() => { setMapPickerTarget('location'); setShowMapPicker(true); }}>
-                        <i className="fa-solid fa-map"></i> Pick on Map
-                      </button>
-                      <button type="submit" className="btn-admin-primary" disabled={saving}>
-                        {saving ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</> : <><i className="fa-solid fa-floppy-disk"></i> Update Location</>}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* ADD TRACKING EVENT */}
-                <div className="admin-card">
-                  <h3><i className="fa-solid fa-timeline"></i> Add Tracking Event</h3>
-                  <form onSubmit={handleAddEvent} className="event-form">
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Status</label>
-                        <input type="text" placeholder="e.g. Arrived at FedEx hub"
-                          value={eventForm.status} required
-                          onChange={e => setEventForm(f => ({ ...f, status: e.target.value }))} />
-                      </div>
-                      <div className="form-group">
-                        <label>Location</label>
-                        <input type="text" placeholder="e.g. Memphis, TN"
-                          value={eventForm.location} required
-                          onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))} />
-                      </div>
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Date & Time</label>
-                        <input type="datetime-local"
-                          value={eventForm.event_time}
-                          onChange={e => setEventForm(f => ({ ...f, event_time: e.target.value }))} />
-                      </div>
-                      <div className="form-group form-group-check">
-                        <label>
-                          <input type="checkbox" checked={eventForm.is_latest}
-                            onChange={e => setEventForm(f => ({ ...f, is_latest: e.target.checked }))} />
-                          &nbsp; Mark as latest event
-                        </label>
-                      </div>
-                    </div>
-                    <button type="submit" className="btn-admin-primary" disabled={saving}>
-                      {saving ? <><i className="fa-solid fa-spinner fa-spin"></i> Adding...</> : <><i className="fa-solid fa-plus"></i> Add Event</>}
-                    </button>
-                  </form>
-                </div>
-
-                {/* EVENTS LIST */}
-                <div className="admin-card">
-                  <h3><i className="fa-solid fa-list"></i> Tracking History ({shipmentDetail.events?.length || 0} events)</h3>
-                  {shipmentDetail.events?.length === 0 ? (
-                    <p className="admin-empty-small">No events yet.</p>
-                  ) : (
-                    <div className="events-list">
-                      {shipmentDetail.events.map(evt => (
-                        <div key={evt.id} className={`event-row ${evt.is_latest ? 'latest' : ''}`}>
-                          <div className="event-dot"></div>
-                          <div className="event-info">
-                            <div className="event-status">{evt.status} {evt.is_latest && <span className="latest-tag">LATEST</span>}</div>
-                            <div className="event-meta">
-                              <i className="fa-solid fa-location-dot"></i> {evt.location} &nbsp;·&nbsp;
-                              <i className="fa-solid fa-clock"></i> {new Date(evt.event_time).toLocaleString()}
-                            </div>
-                          </div>
-                          <button className="btn-icon btn-delete" onClick={() => handleDeleteEvent(evt.id)}>
-                            <i className="fa-solid fa-trash"></i>
-                          </button>
+                    {/* ── SHIPMENT ROW ── */}
+                    <div className="shipment-row">
+                      <div className="shipment-row-main">
+                        <div className="shipment-tracking-num">{s.tracking_number}</div>
+                        <div className="shipment-route">
+                          <span>{s.origin}</span>
+                          <i className="fa-solid fa-arrow-right" style={{ color: 'var(--gray-400)', fontSize: '11px' }}></i>
+                          <span>{s.destination}</span>
                         </div>
-                      ))}
+                      </div>
+                      <div className="shipment-row-meta">
+                        <span className={`status-badge ${s.status}`}>
+                          <i className={`fa-solid ${s.status_icon}`}></i> {s.status_label}
+                        </span>
+                        <span className={`map-pin-indicator ${s.origin_lat ? 'set' : ''}`}>
+                          <i className="fa-solid fa-map"></i>
+                          {s.origin_lat ? ' Map set' : ' No map'}
+                        </span>
+                      </div>
+                      <div className="shipment-row-actions">
+                        <button className="btn-row-action btn-manage"
+                          title={expandedId === s.id ? 'Close' : 'Manage'}
+                          onClick={() => handleExpand(s)}>
+                          <i className={`fa-solid ${expandedId === s.id ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                          <span>{expandedId === s.id ? 'Close' : 'Manage'}</span>
+                        </button>
+                        <button className="btn-row-action btn-edit-row" title="Edit" onClick={() => handleEdit(s)}>
+                          <i className="fa-solid fa-pen"></i>
+                          <span>Edit</span>
+                        </button>
+                        <button className="btn-row-action btn-del-row" title="Delete" onClick={() => handleDelete(s.id)}>
+                          <i className="fa-solid fa-trash"></i>
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* ── EXPANDED PANEL ── */}
+                    {expandedId === s.id && (
+                      <div className="shipment-expand-panel">
+                        {!expandedData ? (
+                          <div className="admin-spinner-wrap" style={{ padding: '24px' }}>
+                            <div className="spinner"></div>
+                          </div>
+                        ) : (
+                          <div className="expand-grid">
+
+                            {/* LEFT: Update live location */}
+                            <div className="expand-col">
+                              <h3 className="expand-col-title">
+                                <i className="fa-solid fa-location-dot"></i> Update Live Location
+                              </h3>
+                              <p className="expand-col-desc">
+                                This moves the pin on the customer's live map.
+                              </p>
+                              <form onSubmit={handleUpdateLocation}>
+                                <div className="form-group">
+                                  <label>Where is the package now?</label>
+                                  <input type="text"
+                                    placeholder="e.g. Chicago, IL — Sorting Facility"
+                                    value={locationForm.current_location}
+                                    onChange={e => setLocationForm(f => ({ ...f, current_location: e.target.value }))} />
+                                </div>
+                                <button type="button" className="btn-map-pick-simple"
+                                  onClick={() => setMapPicker('location')}>
+                                  <i className="fa-solid fa-map-location-dot"></i> Pick location on map
+                                </button>
+                                {(locationForm.map_lat && locationForm.map_lng) && (
+                                  <p className="coords-preview">
+                                    <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
+                                    &nbsp;Pin set: {parseFloat(locationForm.map_lat).toFixed(4)}, {parseFloat(locationForm.map_lng).toFixed(4)}
+                                  </p>
+                                )}
+                                <button type="submit" className="btn-admin-primary" disabled={saving} style={{ marginTop: '12px' }}>
+                                  {saving
+                                    ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</>
+                                    : <><i className="fa-solid fa-floppy-disk"></i> Save Location</>
+                                  }
+                                </button>
+                              </form>
+                            </div>
+
+                            {/* RIGHT: Add tracking event */}
+                            <div className="expand-col">
+                              <h3 className="expand-col-title">
+                                <i className="fa-solid fa-timeline"></i> Add Update
+                              </h3>
+                              <p className="expand-col-desc">
+                                This appears in the customer's tracking history.
+                              </p>
+                              <form onSubmit={handleAddEvent}>
+                                <div className="form-group">
+                                  <label>What happened?</label>
+                                  <input type="text"
+                                    placeholder="e.g. Package arrived at sorting facility"
+                                    value={eventForm.status} required
+                                    onChange={e => setEventForm(f => ({ ...f, status: e.target.value }))} />
+                                </div>
+                                <div className="form-group">
+                                  <label>Where?</label>
+                                  <input type="text"
+                                    placeholder="e.g. Chicago, IL"
+                                    value={eventForm.location} required
+                                    onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))} />
+                                </div>
+                                <div className="form-group">
+                                  <label>When?</label>
+                                  <input type="datetime-local"
+                                    value={eventForm.event_time}
+                                    onChange={e => setEventForm(f => ({ ...f, event_time: e.target.value }))} />
+                                </div>
+                                <label className="checkbox-label">
+                                  <input type="checkbox" checked={eventForm.is_latest}
+                                    onChange={e => setEventForm(f => ({ ...f, is_latest: e.target.checked }))} />
+                                  <span>Show as most recent update</span>
+                                </label>
+                                <button type="submit" className="btn-admin-primary" disabled={saving} style={{ marginTop: '12px' }}>
+                                  {saving
+                                    ? <><i className="fa-solid fa-spinner fa-spin"></i> Adding...</>
+                                    : <><i className="fa-solid fa-plus"></i> Add Update</>
+                                  }
+                                </button>
+                              </form>
+                            </div>
+
+                            {/* BOTTOM: History */}
+                            <div className="expand-col expand-col-full">
+                              <h3 className="expand-col-title">
+                                <i className="fa-solid fa-clock-rotate-left"></i> Tracking History
+                                <span className="event-count">{expandedData.events?.length || 0}</span>
+                              </h3>
+                              {!expandedData.events?.length ? (
+                                <p className="admin-empty-small">No updates yet. Add one above.</p>
+                              ) : (
+                                <div className="events-list">
+                                  {expandedData.events.map(evt => (
+                                    <div key={evt.id} className={`event-row ${evt.is_latest ? 'latest' : ''}`}>
+                                      <div className="event-dot"></div>
+                                      <div className="event-info">
+                                        <div className="event-status">
+                                          {evt.status}
+                                          {evt.is_latest && <span className="latest-tag">LATEST</span>}
+                                        </div>
+                                        <div className="event-meta">
+                                          <i className="fa-solid fa-location-dot"></i> {evt.location}
+                                          &nbsp;·&nbsp;
+                                          <i className="fa-solid fa-clock"></i> {new Date(evt.event_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        </div>
+                                      </div>
+                                      <button className="btn-icon btn-delete" title="Delete"
+                                        onClick={() => handleDeleteEvent(evt.id)}>
+                                        <i className="fa-solid fa-trash"></i>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ===== CREATE / EDIT SHIPMENT ===== */}
-        {activeTab === 'create' && (
+        {/* ════════════════════════════════
+            VIEW: CREATE / EDIT FORM
+        ════════════════════════════════ */}
+        {view === 'form' && (
           <div className="admin-section">
             <div className="admin-section-header">
-              <h1>
-                <i className={`fa-solid ${editingShipment ? 'fa-pen' : 'fa-plus'}`}></i>
-                {editingShipment ? `Edit: ${editingShipment.tracking_number}` : 'New Shipment'}
-              </h1>
+              <div>
+                <h1>
+                  <i className={`fa-solid ${editingShipment ? 'fa-pen' : 'fa-plus'}`}></i>
+                  {editingShipment ? 'Edit Shipment' : 'New Shipment'}
+                </h1>
+                <p className="admin-section-sub">
+                  {editingShipment ? `Editing ${editingShipment.tracking_number}` : 'Fill in the shipment details below'}
+                </p>
+              </div>
+              <button className="btn-admin-secondary" onClick={goToList}>
+                <i className="fa-solid fa-arrow-left"></i> Back to list
+              </button>
             </div>
-            <div className="admin-card">
-              <form onSubmit={handleSaveShipment} className="shipment-form">
+
+            <form onSubmit={handleSave} className="shipment-form-clean">
+
+              {/* ── SECTION 1: Tracking Info ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">1</span>
+                  Tracking Details
+                </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tracking Number *</label>
                     <div className="tracking-gen-row">
-                      <input type="text" placeholder="e.g. GBT-2026-A4K9BZ2M"
+                      <input type="text"
+                        placeholder="Click Generate or type manually"
                         value={form.tracking_number} required
                         disabled={!!editingShipment}
                         onChange={e => setForm(f => ({ ...f, tracking_number: e.target.value.toUpperCase() }))} />
@@ -446,175 +529,198 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                         </button>
                       )}
                     </div>
-                    <p className="field-hint">Format: GBT-YEAR-8CHARS (e.g. GBT-2026-A4K9BZ2M)</p>
+                    <p className="field-hint">Auto-format: GBT-2026-XXXXXXXX</p>
                   </div>
                   <div className="form-group">
-                    <label>Service *</label>
+                    <label>Service Type *</label>
                     <input type="text" placeholder="e.g. GBT Express"
                       value={form.service} required
                       onChange={e => setForm(f => ({ ...f, service: e.target.value }))} />
                   </div>
                 </div>
+              </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Status *</label>
-                    <select value={form.status} onChange={e => handleStatusChange(e.target.value)}>
-                      {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Progress Step (0–4)</label>
-                    <input type="number" min="0" max="4"
-                      value={form.progress_step}
-                      onChange={e => setForm(f => ({ ...f, progress_step: parseInt(e.target.value) }))} />
-                  </div>
+              {/* ── SECTION 2: Status ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">2</span>
+                  Package Status
                 </div>
+                <div className="status-picker">
+                  {STATUSES.map(s => (
+                    <button key={s.value} type="button"
+                      className={`status-pick-btn ${form.status === s.value ? 'active' : ''} ${s.value}`}
+                      onClick={() => handleStatusChange(s.value)}>
+                      <i className={`fa-solid ${s.icon}`}></i>
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
+              {/* ── SECTION 3: Route ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">3</span>
+                  Route
+                </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Origin *</label>
+                    <label>Pickup City / Origin *</label>
                     <input type="text" placeholder="e.g. Los Angeles, CA"
                       value={form.origin} required
                       onChange={e => setForm(f => ({ ...f, origin: e.target.value }))} />
                   </div>
                   <div className="form-group">
-                    <label>Destination *</label>
+                    <label>Delivery Address / Destination *</label>
                     <input type="text" placeholder="e.g. New York, NY 10001"
                       value={form.destination} required
                       onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} />
                   </div>
                 </div>
-
                 <div className="form-group">
-                  <label>Current Location *</label>
-                  <input type="text" placeholder="e.g. Memphis, TN — FedEx Hub"
+                  <label>Where is the package right now? *</label>
+                  <input type="text" placeholder="e.g. Memphis, TN — Sorting Facility"
                     value={form.current_location} required
                     onChange={e => setForm(f => ({ ...f, current_location: e.target.value }))} />
                 </div>
+              </div>
 
+              {/* ── SECTION 4: Package Details ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">4</span>
+                  Package Details
+                </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Weight</label>
+                    <label>Weight <span className="optional">(optional)</span></label>
                     <input type="text" placeholder="e.g. 2.4 lbs"
                       value={form.weight}
                       onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} />
                   </div>
                   <div className="form-group">
-                    <label>Estimated Delivery</label>
+                    <label>Estimated Delivery Date <span className="optional">(optional)</span></label>
                     <input type="text" placeholder="e.g. September 18, 2026"
                       value={form.estimated_delivery}
                       onChange={e => setForm(f => ({ ...f, estimated_delivery: e.target.value }))} />
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Delivered At (if delivered)</label>
-                    <input type="datetime-local"
-                      value={form.delivered_at || ''}
-                      onChange={e => setForm(f => ({ ...f, delivered_at: e.target.value || null }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Recipient</label>
-                    <input type="text" placeholder="e.g. J. Mitchell"
-                      value={form.recipient}
-                      onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))} />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Map Latitude (current position)</label>
-                    <input type="number" step="any" placeholder="e.g. 40.7128"
-                      value={form.map_lat}
-                      onChange={e => setForm(f => ({ ...f, map_lat: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Map Longitude (current position)</label>
-                    <input type="number" step="any" placeholder="e.g. -74.0060"
-                      value={form.map_lng}
-                      onChange={e => setForm(f => ({ ...f, map_lng: e.target.value }))} />
-                  </div>
-                </div>
-                <div style={{ marginBottom: '16px' }}>
-                  <button type="button" className="btn-admin-secondary"
-                    onClick={() => { setMapPickerTarget('form'); setShowMapPicker(true); }}>
-                    <i className="fa-solid fa-map"></i> Pick Current Location on Map
-                  </button>
-                </div>
-
-                <div className="admin-coord-section">
-                  <h4><i className="fa-solid fa-route"></i> Route Coordinates (for animated map)</h4>
-                  <p className="admin-card-desc">Set origin and destination coordinates so the map animates the package moving along the route.</p>
+                {/* Only show if status is delivered */}
+                {form.status === 'delivered' && (
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Origin Latitude</label>
-                      <input type="number" step="any" placeholder="e.g. 34.0522"
-                        value={form.origin_lat}
-                        onChange={e => setForm(f => ({ ...f, origin_lat: e.target.value }))} />
+                      <label>Delivered At</label>
+                      <input type="datetime-local"
+                        value={form.delivered_at || ''}
+                        onChange={e => setForm(f => ({ ...f, delivered_at: e.target.value || null }))} />
                     </div>
                     <div className="form-group">
-                      <label>Origin Longitude</label>
-                      <input type="number" step="any" placeholder="e.g. -118.2437"
-                        value={form.origin_lng}
-                        onChange={e => setForm(f => ({ ...f, origin_lng: e.target.value }))} />
+                      <label>Recipient Name <span className="optional">(optional)</span></label>
+                      <input type="text" placeholder="e.g. J. Mitchell"
+                        value={form.recipient}
+                        onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))} />
                     </div>
                   </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <button type="button" className="btn-admin-secondary"
-                      onClick={() => { setMapPickerTarget('origin'); setShowMapPicker(true); }}>
-                      <i className="fa-solid fa-map-pin"></i> Pick Origin on Map
+                )}
+              </div>
+
+              {/* ── SECTION 5: Map ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">5</span>
+                  Live Map Setup
+                </div>
+                <p className="section-desc">
+                  Set the map coordinates so customers can see the package moving on a live map.
+                </p>
+
+                <div className="map-setup-grid">
+                  <div className="map-setup-item">
+                    <div className="map-setup-label">
+                      <span className="map-dot origin"></span> Pickup Location
+                    </div>
+                    <button type="button" className="btn-map-pick-simple"
+                      onClick={() => setMapPicker('origin')}>
+                      <i className="fa-solid fa-map-location-dot"></i>
+                      {form.origin_lat
+                        ? `✓ Set (${parseFloat(form.origin_lat).toFixed(3)}, ${parseFloat(form.origin_lng).toFixed(3)})`
+                        : 'Click to set on map'}
                     </button>
                   </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Destination Latitude</label>
-                      <input type="number" step="any" placeholder="e.g. 40.7128"
-                        value={form.dest_lat}
-                        onChange={e => setForm(f => ({ ...f, dest_lat: e.target.value }))} />
+
+                  <div className="map-setup-item">
+                    <div className="map-setup-label">
+                      <span className="map-dot pkg"></span> Current Position
                     </div>
-                    <div className="form-group">
-                      <label>Destination Longitude</label>
-                      <input type="number" step="any" placeholder="e.g. -74.0060"
-                        value={form.dest_lng}
-                        onChange={e => setForm(f => ({ ...f, dest_lng: e.target.value }))} />
-                    </div>
+                    <button type="button" className="btn-map-pick-simple"
+                      onClick={() => setMapPicker('current')}>
+                      <i className="fa-solid fa-map-location-dot"></i>
+                      {form.map_lat
+                        ? `✓ Set (${parseFloat(form.map_lat).toFixed(3)}, ${parseFloat(form.map_lng).toFixed(3)})`
+                        : 'Click to set on map'}
+                    </button>
                   </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <button type="button" className="btn-admin-secondary"
-                      onClick={() => { setMapPickerTarget('dest'); setShowMapPicker(true); }}>
-                      <i className="fa-solid fa-flag-checkered"></i> Pick Destination on Map
+
+                  <div className="map-setup-item">
+                    <div className="map-setup-label">
+                      <span className="map-dot dest"></span> Delivery Destination
+                    </div>
+                    <button type="button" className="btn-map-pick-simple"
+                      onClick={() => setMapPicker('dest')}>
+                      <i className="fa-solid fa-map-location-dot"></i>
+                      {form.dest_lat
+                        ? `✓ Set (${parseFloat(form.dest_lat).toFixed(3)}, ${parseFloat(form.dest_lng).toFixed(3)})`
+                        : 'Click to set on map'}
                     </button>
                   </div>
                 </div>
+              </div>
 
-                <div className="form-actions">
-                  <button type="button" className="btn-admin-secondary"
-                    onClick={() => { setActiveTab('shipments'); setEditingShipment(null); setForm(EMPTY_SHIPMENT); }}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn-admin-primary" disabled={saving}>
-                    {saving
-                      ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</>
-                      : <><i className="fa-solid fa-floppy-disk"></i> {editingShipment ? 'Update Shipment' : 'Create Shipment'}</>
-                    }
-                  </button>
-                </div>
-              </form>
-            </div>
+              {/* ── FORM ACTIONS ── */}
+              <div className="form-actions form-actions-sticky">
+                <button type="button" className="btn-admin-secondary" onClick={goToList}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-admin-primary btn-save-big" disabled={saving}>
+                  {saving
+                    ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</>
+                    : <><i className="fa-solid fa-floppy-disk"></i>
+                        {editingShipment ? 'Save Changes' : 'Create Shipment'}
+                      </>
+                  }
+                </button>
+              </div>
+
+            </form>
           </div>
         )}
       </main>
 
       {/* MAP PICKER MODAL */}
-      {showMapPicker && (
+      {mapPicker && (
         <AdminMapPicker
-          initialLat={mapPickerTarget === 'form' ? form.map_lat : locationForm.map_lat}
-          initialLng={mapPickerTarget === 'form' ? form.map_lng : locationForm.map_lng}
+          initialLat={
+            mapPicker === 'current'  ? form.map_lat    :
+            mapPicker === 'origin'   ? form.origin_lat :
+            mapPicker === 'dest'     ? form.dest_lat   :
+            locationForm.map_lat
+          }
+          initialLng={
+            mapPicker === 'current'  ? form.map_lng    :
+            mapPicker === 'origin'   ? form.origin_lng :
+            mapPicker === 'dest'     ? form.dest_lng   :
+            locationForm.map_lng
+          }
           onConfirm={handleMapPick}
-          onClose={() => setShowMapPicker(false)}
+          onClose={() => setMapPicker(null)}
         />
+      )}
+
+      {/* SIDEBAR OVERLAY on mobile */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
   );
