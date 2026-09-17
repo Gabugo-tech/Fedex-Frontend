@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { signIn } from '../api/auth';
+import { useLang } from '../i18n/LanguageContext';
 
 export default function SignInModal({ onSuccess, onClose }) {
+  const { t } = useLang();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
 
-  // Close on Escape key
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose(); }
     window.addEventListener('keydown', onKey);
@@ -31,7 +32,6 @@ export default function SignInModal({ onSuccess, onClose }) {
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="signin-title">
-        {/* Close button */}
         <button className="modal-close" onClick={onClose} aria-label="Close">
           <i className="fa-solid fa-xmark"></i>
         </button>
@@ -40,12 +40,12 @@ export default function SignInModal({ onSuccess, onClose }) {
           <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
         </div>
 
-        <h2 id="signin-title" className="modal-title">Sign In</h2>
-        <p className="modal-sub">Access your FedEx account</p>
+        <h2 id="signin-title" className="modal-title">{t.signInTitle}</h2>
+        <p className="modal-sub">{t.signInSub}</p>
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
-            <label htmlFor="signin-email">Email Address</label>
+            <label htmlFor="signin-email">{t.emailLabel}</label>
             <input
               id="signin-email"
               type="email"
@@ -59,7 +59,7 @@ export default function SignInModal({ onSuccess, onClose }) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="signin-password">Password</label>
+            <label htmlFor="signin-password">{t.passwordLabel}</label>
             <input
               id="signin-password"
               type="password"
@@ -79,8 +79,8 @@ export default function SignInModal({ onSuccess, onClose }) {
 
           <button type="submit" className="btn-modal-submit" disabled={loading}>
             {loading
-              ? <><i className="fa-solid fa-spinner fa-spin"></i> Signing in...</>
-              : <><i className="fa-solid fa-arrow-right-to-bracket"></i> Sign In</>
+              ? <><i className="fa-solid fa-spinner fa-spin"></i> {t.signingIn}</>
+              : <><i className="fa-solid fa-arrow-right-to-bracket"></i> {t.signInTitle}</>
             }
           </button>
         </form>

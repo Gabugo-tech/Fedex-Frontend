@@ -1,6 +1,9 @@
 import React from 'react';
+import { useLang } from '../i18n/LanguageContext';
 
 export default function Footer() {
+  const { t } = useLang();
+
   return (
     <footer className="footer">
       <div className="container footer-inner">
@@ -8,7 +11,7 @@ export default function Footer() {
           <div className="logo small">
             <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
           </div>
-          <p>Delivering possibilities around the world.</p>
+          <p>{t.footerTagline}</p>
           <div className="social-links">
             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
               <i className="fa-brands fa-facebook"></i>
@@ -26,34 +29,34 @@ export default function Footer() {
         </div>
 
         <div className="footer-links">
-          <h5>Tracking</h5>
-          <a href="/">Track a Package</a>
-          <a href="/">Proof of Delivery</a>
-          <a href="/">Notifications</a>
+          <h5>{t.footerTracking}</h5>
+          <a href="/">{t.footerTrackPkg}</a>
+          <a href="/">{t.footerProof}</a>
+          <a href="/">{t.footerNotif}</a>
         </div>
 
         <div className="footer-links">
-          <h5>Services</h5>
-          <a href="/">FedEx Express</a>
-          <a href="/">FedEx Ground</a>
-          <a href="/">FedEx International</a>
+          <h5>{t.footerServices}</h5>
+          <a href="/">GBT Express</a>
+          <a href="/">GBT Ground</a>
+          <a href="/">GBT International</a>
         </div>
 
         <div className="footer-links">
-          <h5>Support</h5>
-          <a href="mailto:support@fedex.com">Contact Us</a>
-          <a href="/">FAQs</a>
-          <a href="/">Service Alerts</a>
+          <h5>{t.footerSupport}</h5>
+          <a href="mailto:support@fedex.com">{t.footerContact}</a>
+          <a href="/">{t.footerFaq}</a>
+          <a href="/">{t.footerAlerts}</a>
         </div>
       </div>
 
       <div className="footer-bottom">
         <div className="container">
-          <p>© {new Date().getFullYear()} FedEx Tracker. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {t.footerCopy}</p>
           <div className="footer-bottom-links">
-            <a href="/">Privacy Policy</a>
-            <a href="/">Terms of Use</a>
-            <a href="/">Accessibility</a>
+            <a href="/">{t.footerPrivacy}</a>
+            <a href="/">{t.footerTerms}</a>
+            <a href="/">{t.footerAccess}</a>
           </div>
         </div>
       </div>

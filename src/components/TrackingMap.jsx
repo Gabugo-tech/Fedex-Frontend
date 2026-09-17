@@ -62,6 +62,7 @@ export default function TrackingMap({
   originLat, originLng,
   destLat, destLng,
   status,
+  liveLabel,
 }) {
   const mapRef      = useRef(null);
   const instanceRef = useRef(null);
@@ -231,7 +232,7 @@ export default function TrackingMap({
   return (
     <div className="tracking-map-section">
       <h4>
-        <i className="fa-solid fa-location-dot"></i> Live Package Location
+        <i className="fa-solid fa-location-dot"></i> {liveLabel || 'Live Package Location'}
         {isLive && (
           <span className="live-badge">
             <i className="fa-solid fa-circle"></i> LIVE

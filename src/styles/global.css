@@ -1538,3 +1538,25 @@ a:hover { color: var(--orange); }
   .form-section { padding: 16px; }
   .expand-col { padding: 14px; }
 }
+
+/* ===== LANGUAGE SWITCHER ===== */
+.lang-switcher {
+  display: flex; align-items: center; gap: 4px;
+}
+.lang-switcher.mobile {
+  padding: 6px 0; border-top: 1px solid var(--gray-200);
+  margin-top: 4px;
+}
+.lang-btn {
+  background: none; border: 1px solid transparent;
+  color: var(--gray-600); font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.15s; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
+}
+.lang-btn:hover { border-color: var(--purple); color: var(--purple); }
+.lang-btn.active {
+  background: var(--purple); color: var(--white);
+  border-color: var(--purple);
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import TrackingMap from './TrackingMap';
+import { useLang } from '../i18n/LanguageContext';
 
 const STATUS_CLASS = {
   delivered:      'delivered',
@@ -18,6 +19,7 @@ const STATUS_ICON = {
 };
 
 export default function ResultCard({ result, steps }) {
+  const { t } = useLang();
   const [copied, setCopied] = useState(false);
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
@@ -37,12 +39,12 @@ export default function ResultCard({ result, steps }) {
       {/* ── CARD HEADER ── */}
       <div className="result-card-header">
         <div className="result-card-header-left">
-          <div className="tracking-number-label">Tracking Number</div>
+          <div className="tracking-number-label">{t.trackingNumber}</div>
           <div className="tracking-number-row">
             <div className="tracking-number-value">{result.tracking_number}</div>
-            <button className="btn-copy" onClick={copyTracking} title="Copy tracking number">
+            <button className="btn-copy" onClick={copyTracking} title={t.copy}>
               <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`}></i>
-              <span>{copied ? 'Copied!' : 'Copy'}</span>
+              <span>{copied ? t.copied : t.copy}</span>
             </button>
           </div>
           <div className="tracking-service-badge">
@@ -67,18 +69,18 @@ export default function ResultCard({ result, steps }) {
         <div className="info-block">
           <div className="info-block-icon"><i className="fa-solid fa-location-dot"></i></div>
           <div>
-            <div className="info-block-label">Current Location</div>
+            <div className="info-block-label">{t.currentLocation}</div>
             <div className="info-block-value">{result.current_location}</div>
           </div>
         </div>
         <div className="info-block">
           <div className="info-block-icon"><i className="fa-solid fa-route"></i></div>
           <div>
-            <div className="info-block-label">Route</div>
+            <div className="info-block-label">{t.route}</div>
             <div className="info-block-value">{result.destination}</div>
             <div className="info-block-sub">
               <i className="fa-solid fa-arrow-right-long" style={{ fontSize: '10px', marginRight: '4px' }}></i>
-              From: {result.origin}
+              {t.from} {result.origin}
             </div>
           </div>
         </div>
@@ -86,9 +88,9 @@ export default function ResultCard({ result, steps }) {
           <div className="info-block">
             <div className="info-block-icon delivered"><i className="fa-solid fa-circle-check"></i></div>
             <div>
-              <div className="info-block-label">Delivered</div>
+              <div className="info-block-label">{t.delivered}</div>
               <div className="info-block-value">
-                {new Date(result.delivered_at).toLocaleString('en-US', {
+                {new Date(result.delivered_at).toLocaleString(undefined, {
                   month: 'short', day: 'numeric', year: 'numeric',
                   hour: 'numeric', minute: '2-digit', hour12: true,
                 })}
@@ -105,9 +107,9 @@ export default function ResultCard({ result, steps }) {
           <div className="info-block">
             <div className="info-block-icon"><i className="fa-solid fa-calendar-check"></i></div>
             <div>
-              <div className="info-block-label">Estimated Delivery</div>
+              <div className="info-block-label">{t.estimatedDelivery}</div>
               <div className="info-block-value">{result.estimated_delivery || '—'}</div>
-              <div className="info-block-sub">Subject to change</div>
+              <div className="info-block-sub">{t.subjectToChange}</div>
             </div>
           </div>
         )}
@@ -124,12 +126,13 @@ export default function ResultCard({ result, steps }) {
           destLat={result.dest_lat ? parseFloat(result.dest_lat) : null}
           destLng={result.dest_lng ? parseFloat(result.dest_lng) : null}
           status={result.status}
+          liveLabel={t.liveLocation}
         />
       )}
 
       {/* ── PROGRESS BAR ── */}
       <div className="progress-section">
-        <h4>Shipment Progress</h4>
+        <h4>{t.shipmentProgress}</h4>
         <div className="progress-track">
           <div className="progress-fill" style={{ width: `${pct}%` }}></div>
           {steps.map((step, i) => {
@@ -148,10 +151,10 @@ export default function ResultCard({ result, steps }) {
 
       {/* ── TIMELINE ── */}
       <div className="timeline-section">
-        <h4>Tracking History</h4>
+        <h4>{t.trackingHistory}</h4>
         <div className="timeline">
           {result.timeline.length === 0 ? (
-            <p style={{ color: 'var(--gray-400)', fontSize: '13px' }}>No events recorded yet.</p>
+            <p style={{ color: 'var(--gray-400)', fontSize: '13px' }}>{t.noEvents}</p>
           ) : (
             result.timeline.map((evt, i) => (
               <div key={`${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>

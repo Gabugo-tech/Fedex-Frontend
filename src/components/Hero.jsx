@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLang } from '../i18n/LanguageContext';
 
 export default function Hero({ onTrack, loading, error }) {
+  const { t } = useLang();
   const [input, setInput]           = useState('');
   const [inputError, setInputError] = useState(false);
-  // Fix #10: use a ref to scroll after results are rendered
   const didTrackRef = useRef(false);
 
   useEffect(() => {
@@ -22,7 +23,6 @@ export default function Hero({ onTrack, loading, error }) {
     }
     didTrackRef.current = true;
     onTrack(input);
-    // Fix #8: clear input after submitting
     setInput('');
   }
 
@@ -33,38 +33,37 @@ export default function Hero({ onTrack, loading, error }) {
   return (
     <section className="hero">
       <div className="container hero-content">
-        <h1>Track Your Shipment</h1>
-        <p>Get real-time updates on your package location, delivery status, and estimated arrival.</p>
+        <h1>{t.heroTitle}</h1>
+        <p>{t.heroSub}</p>
 
         <div className="tracking-card">
-          {/* Tabs */}
           <div className="tracking-tabs">
-            <button className="tab active">Track</button>
+            <button className="tab active">{t.trackBtn}</button>
           </div>
 
           <div className="tracking-body">
-            <label htmlFor="trackingInput">Tracking Number</label>
+            <label htmlFor="trackingInput">{t.trackLabel}</label>
             <div className="tracking-input-row">
               <input
                 id="trackingInput"
                 type="text"
-                placeholder="Enter your tracking number"
+                placeholder={t.trackPlaceholder}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 className={inputError ? 'error' : ''}
                 maxLength={200}
-                aria-label="Tracking number input"
+                aria-label={t.trackLabel}
               />
               <button
                 className="btn-track"
                 onClick={handleTrack}
                 disabled={loading}
-                aria-label="Track package"
+                aria-label={t.trackBtn}
               >
                 {loading
-                  ? <><i className="fa-solid fa-spinner fa-spin"></i> Tracking...</>
-                  : <><i className="fa-solid fa-magnifying-glass"></i> Track</>
+                  ? <><i className="fa-solid fa-spinner fa-spin"></i> {t.tracking}</>
+                  : <><i className="fa-solid fa-magnifying-glass"></i> {t.trackBtn}</>
                 }
               </button>
             </div>

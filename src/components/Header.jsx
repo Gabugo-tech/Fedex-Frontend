@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useLang } from '../i18n/LanguageContext';
 
 export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard }) {
+  const { t, lang, switchLang, LANGUAGES } = useLang();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -10,7 +12,19 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
         <div className="container top-bar-inner">
           <div className="top-links">
             <a href="#"><i className="fa-solid fa-globe"></i> United States</a>
-            <a href="#">English</a>
+            {/* Language Switcher */}
+            <div className="lang-switcher">
+              {Object.entries(LANGUAGES).map(([code, info]) => (
+                <button
+                  key={code}
+                  className={`lang-btn ${lang === code ? 'active' : ''}`}
+                  onClick={() => switchLang(code)}
+                  aria-label={`Switch to ${info.label}`}
+                >
+                  {info.flag} {info.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="top-links">
             {user ? (
@@ -20,19 +34,19 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
                 </span>
                 {onGoToDashboard && (
                   <button className="top-signin-btn" onClick={onGoToDashboard}>
-                    <i className="fa-solid fa-gauge"></i> Dashboard
+                    <i className="fa-solid fa-gauge"></i> {t.dashboard}
                   </button>
                 )}
                 <button className="top-signout" onClick={onSignOut}>
-                  <i className="fa-solid fa-right-from-bracket"></i> Sign Out
+                  <i className="fa-solid fa-right-from-bracket"></i> {t.signOut}
                 </button>
               </>
             ) : (
               <button className="top-signin-btn" onClick={onSignInClick}>
-                <i className="fa-regular fa-user"></i> Sign In
+                <i className="fa-regular fa-user"></i> {t.signIn}
               </button>
             )}
-            <a href="#"><i className="fa-solid fa-headset"></i> Support</a>
+            <a href="#"><i className="fa-solid fa-headset"></i> {t.support}</a>
           </div>
         </div>
       </div>
@@ -48,7 +62,7 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
             <a href="#">Tracking</a>
             <a href="#">Printing</a>
             <a href="#">Locations</a>
-            <a href="#">Support</a>
+            <a href="#">{t.support}</a>
           </nav>
           {user && (
             <div className="header-actions">
@@ -67,21 +81,33 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
           <a href="#">Tracking</a>
           <a href="#">Printing</a>
           <a href="#">Locations</a>
-          <a href="#">Support</a>
+          <a href="#">{t.support}</a>
+          {/* Mobile language switcher */}
+          <div className="lang-switcher mobile">
+            {Object.entries(LANGUAGES).map(([code, info]) => (
+              <button
+                key={code}
+                className={`lang-btn ${lang === code ? 'active' : ''}`}
+                onClick={() => { switchLang(code); setMenuOpen(false); }}
+              >
+                {info.flag} {info.label}
+              </button>
+            ))}
+          </div>
           {user ? (
             <>
               {onGoToDashboard && (
                 <button onClick={onGoToDashboard} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '15px', fontWeight: 600, color: 'var(--purple)', cursor: 'pointer', padding: '6px 0', fontFamily: 'Inter, sans-serif' }}>
-                  <i className="fa-solid fa-gauge"></i> Dashboard
+                  <i className="fa-solid fa-gauge"></i> {t.dashboard}
                 </button>
               )}
               <button onClick={onSignOut} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '15px', fontWeight: 600, color: 'var(--red)', cursor: 'pointer', padding: '6px 0', fontFamily: 'Inter, sans-serif' }}>
-                <i className="fa-solid fa-right-from-bracket"></i> Sign Out
+                <i className="fa-solid fa-right-from-bracket"></i> {t.signOut}
               </button>
             </>
           ) : (
             <button onClick={onSignInClick} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '15px', fontWeight: 600, cursor: 'pointer', padding: '6px 0', fontFamily: 'Inter, sans-serif' }}>
-              <i className="fa-regular fa-user"></i> Sign In
+              <i className="fa-regular fa-user"></i> {t.signIn}
             </button>
           )}
         </div>
