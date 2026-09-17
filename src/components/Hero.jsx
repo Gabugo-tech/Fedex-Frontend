@@ -48,7 +48,7 @@ export default function Hero({ onTrack, loading, error }) {
               <input
                 id="trackingInput"
                 type="text"
-                placeholder="Enter up to 5 tracking numbers separated by commas..."
+                placeholder="Enter your tracking number"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
