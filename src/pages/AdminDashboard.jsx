@@ -202,10 +202,9 @@ export default function AdminDashboard({ session, onLogout }) {
           <button className="btn-logout" onClick={handleLogout}>
             <i className="fa-solid fa-right-from-bracket"></i> Logout
           </button>
-          <a href="#" onClick={e => { e.preventDefault(); onLogout(); }}
-            className="admin-back-link">
+          <button className="admin-back-link" onClick={onLogout}>
             <i className="fa-solid fa-arrow-left"></i> Back to site
-          </a>
+          </button>
         </div>
       </aside>
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function Header() {
+export default function Header({ user, onSignInClick, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -13,7 +13,20 @@ export default function Header() {
             <a href="#">English</a>
           </div>
           <div className="top-links">
-            <a href="#"><i className="fa-regular fa-user"></i> Sign In / Register</a>
+            {user ? (
+              <>
+                <span className="top-user">
+                  <i className="fa-solid fa-user-shield"></i> {user.email}
+                </span>
+                <button className="top-signout" onClick={onSignOut}>
+                  <i className="fa-solid fa-right-from-bracket"></i> Sign Out
+                </button>
+              </>
+            ) : (
+              <button className="top-signin-btn" onClick={onSignInClick}>
+                <i className="fa-regular fa-user"></i> Sign In
+              </button>
+            )}
             <a href="#"><i className="fa-solid fa-headset"></i> Support</a>
           </div>
         </div>
@@ -45,7 +58,15 @@ export default function Header() {
           <a href="#">Printing</a>
           <a href="#">Locations</a>
           <a href="#">Support</a>
-          <a href="#">Sign In / Register</a>
+          {user ? (
+            <button className="top-signout" onClick={onSignOut} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '15px', fontWeight: 600, color: 'var(--red)', cursor: 'pointer', padding: '6px 0' }}>
+              <i className="fa-solid fa-right-from-bracket"></i> Sign Out
+            </button>
+          ) : (
+            <button className="top-signin-btn" onClick={onSignInClick} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '15px', fontWeight: 600, cursor: 'pointer', padding: '6px 0' }}>
+              <i className="fa-regular fa-user"></i> Sign In
+            </button>
+          )}
         </div>
       </header>
     </>

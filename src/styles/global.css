@@ -684,3 +684,72 @@ a:hover { color: var(--orange); }
   .form-row { grid-template-columns: 1fr; }
   .admin-table { font-size: 13px; }
 }
+
+/* ===== TOP BAR SIGN IN / USER ===== */
+.top-signin-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--gray-600); font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'Inter', sans-serif; padding: 0;
+  transition: color 0.2s;
+}
+.top-signin-btn:hover { color: var(--purple); }
+
+.top-user {
+  font-size: 12px; font-weight: 600; color: var(--purple);
+  display: flex; align-items: center; gap: 5px;
+}
+.top-signout {
+  background: none; border: none; cursor: pointer;
+  color: var(--gray-600); font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'Inter', sans-serif; padding: 0;
+  transition: color 0.2s;
+}
+.top-signout:hover { color: var(--red); }
+
+/* ===== SIGN IN MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 9999; display: flex; align-items: center;
+  justify-content: center; padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+.modal-card {
+  background: var(--white); border-radius: 16px;
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 400px;
+  padding: 40px 36px 36px; position: relative;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.modal-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--gray-100); border: none; cursor: pointer;
+  font-size: 14px; color: var(--gray-600);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+.modal-close:hover { background: var(--gray-200); color: var(--gray-800); }
+
+.modal-logo { font-size: 32px; font-weight: 900; margin-bottom: 20px; }
+.modal-title {
+  font-size: 22px; font-weight: 800; color: var(--gray-800); margin-bottom: 4px;
+}
+.modal-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 24px; }
+
+.modal-form .form-group { margin-bottom: 16px; }
+
+.btn-modal-submit {
+  width: 100%; background: var(--purple); color: var(--white);
+  border: none; padding: 13px; border-radius: 6px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background 0.2s; font-family: 'Inter', sans-serif;
+  margin-top: 8px;
+}
+.btn-modal-submit:hover { background: var(--purple-dark); }
+.btn-modal-submit:disabled { opacity: 0.7; pointer-events: none; }

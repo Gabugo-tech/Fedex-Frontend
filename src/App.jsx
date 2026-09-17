@@ -5,49 +5,29 @@ import ResultsSection from './components/ResultsSection';
 import Features from './components/Features';
 import Services from './components/Services';
 import Footer from './components/Footer';
-import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import SignInModal from './components/SignInModal';
 import { fetchTracking } from './api/tracking';
-import { getSession } from './api/auth';
+import { getSession, signOut } from './api/auth';
+
+const ADMIN_EMAIL = 'nnanwubagabriel@gmail.com';
 
 export default function App() {
   const [results, setResults]           = useState([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [hasSearched, setHasSearched]   = useState(false);
-  const [page, setPage]                 = useState('home'); // 'home' | 'admin-login' | 'admin'
   const [adminSession, setAdminSession] = useState(null);
+  const [showSignIn, setShowSignIn]     = useState(false);
 
-  // On mount: check for an existing valid session only — no hash routing
+  // On mount: restore existing session
   useEffect(() => {
-    // Clear any leftover #/admin hash from the URL bar so it's never visible
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname);
-    }
-
     getSession().then(session => {
-      if (session) {
+      if (session && session.user.email === ADMIN_EMAIL) {
         setAdminSession(session);
-        setPage('admin');
       }
     });
   }, []);
-
-  // Secret keyboard shortcut: Ctrl + Shift + A  →  opens admin login
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
-        e.preventDefault();
-        setPage(p => p === 'home' ? 'admin-login' : p);
-      }
-      // Escape from login page back to home
-      if (e.key === 'Escape' && page === 'admin-login') {
-        setPage('home');
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [page]);
 
   async function handleTrack(numbersRaw) {
     setLoading(true);
@@ -72,20 +52,34 @@ export default function App() {
 
   function handleLoginSuccess(session) {
     setAdminSession(session);
-    setPage('admin');
+    setShowSignIn(false);
   }
 
-  function handleAdminLogout() {
+  async function handleSignOut() {
+    await signOut();
     setAdminSession(null);
-    setPage('home');
+    setResults([]);
+    setHasSearched(false);
   }
 
-  if (page === 'admin-login') return <AdminLogin onSuccess={handleLoginSuccess} onCancel={() => setPage('home')} />;
-  if (page === 'admin')       return <AdminDashboard session={adminSession} onLogout={handleAdminLogout} />;
+  // Admin is logged in — show full dashboard
+  if (adminSession) {
+    return (
+      <AdminDashboard
+        session={adminSession}
+        onLogout={handleSignOut}
+      />
+    );
+  }
 
+  // Public site
   return (
     <>
-      <Header />
+      <Header
+        user={null}
+        onSignInClick={() => setShowSignIn(true)}
+        onSignOut={handleSignOut}
+      />
       <Hero onTrack={handleTrack} loading={loading} error={error} />
       {hasSearched && (
         <ResultsSection results={results} loading={loading} onClear={handleClear} />
@@ -93,6 +87,13 @@ export default function App() {
       <Features />
       <Services />
       <Footer />
+
+      {showSignIn && (
+        <SignInModal
+          onSuccess={handleLoginSuccess}
+          onClose={() => setShowSignIn(false)}
+        />
+      )}
     </>
   );
 }
