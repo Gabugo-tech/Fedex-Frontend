@@ -31,10 +31,16 @@ export default function Services() {
         <div className="services-grid">
           {SERVICES.map(s => (
             <div key={s.title} className="service-card">
-              <i className={`fa-solid ${s.icon}`}></i>
+              <i className={`fa-solid ${s.icon}`} aria-hidden="true"></i>
               <h4>{s.title}</h4>
               <p>{s.desc}</p>
-              <a href="#">Learn More →</a>
+              {/* Fix #4: no-op href replaced with button */}
+              <button
+                className="service-learn-more"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              >
+                Learn More →
+              </button>
             </div>
           ))}
         </div>

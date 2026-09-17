@@ -92,7 +92,7 @@ export default function ResultCard({ result, steps }) {
         <h4>Tracking History</h4>
         <div className="timeline">
           {result.timeline.map((evt, i) => (
-            <div key={i} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
+            <div key={`${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
               <div className="timeline-dot"></div>
               <div className="timeline-date">{evt.date}</div>
               <div className="timeline-status">{evt.status}</div>

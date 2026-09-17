@@ -5,26 +5,19 @@ const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
 function loadLeaflet() {
   return new Promise((resolve) => {
-    // CSS — inject once
     if (!document.getElementById('leaflet-css')) {
       const link = Object.assign(document.createElement('link'), {
         id: 'leaflet-css', rel: 'stylesheet', href: LEAFLET_CSS,
       });
       document.head.appendChild(link);
     }
-
-    // JS — already loaded
     if (window.L) return resolve();
-
-    // JS — script already injected but not yet ready
     if (document.getElementById('leaflet-js')) {
       const wait = setInterval(() => {
         if (window.L) { clearInterval(wait); resolve(); }
       }, 50);
       return;
     }
-
-    // JS — inject fresh
     const script = Object.assign(document.createElement('script'), {
       id: 'leaflet-js', src: LEAFLET_JS,
     });
@@ -34,18 +27,27 @@ function loadLeaflet() {
 }
 
 export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onClose }) {
-  const mapRef    = useRef(null);
+  const mapRef     = useRef(null);
   const leafletRef = useRef(null);
   const markerRef  = useRef(null);
+  // Fix #6: track mount state to prevent crash on fast close
+  const mountedRef = useRef(true);
   const [coords, setCoords] = useState({
     lat: parseFloat(initialLat) || 39.8283,
     lng: parseFloat(initialLng) || -98.5795,
   });
 
   useEffect(() => {
-    loadLeaflet().then(initMap);
+    mountedRef.current = true;
+
+    loadLeaflet().then(() => {
+      // Fix #6: bail out if component was unmounted before Leaflet loaded
+      if (!mountedRef.current || !mapRef.current) return;
+      initMap();
+    });
 
     return () => {
+      mountedRef.current = false;
       if (leafletRef.current) {
         leafletRef.current.remove();
         leafletRef.current = null;
@@ -65,11 +67,13 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
     marker.bindPopup('Drag me or click the map to set location').openPopup();
 
     marker.on('dragend', e => {
+      if (!mountedRef.current) return;
       const { lat, lng } = e.target.getLatLng();
       setCoords({ lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) });
     });
 
     map.on('click', e => {
+      if (!mountedRef.current) return;
       const { lat, lng } = e.latlng;
       const c = { lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) };
       marker.setLatLng([c.lat, c.lng]);
@@ -85,7 +89,7 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
       <div className="map-picker-modal">
         <div className="map-picker-header">
           <h3><i className="fa-solid fa-map-location-dot"></i> Pick Package Location</h3>
-          <button className="btn-icon btn-close" onClick={onClose} aria-label="Close">
+          <button className="btn-icon btn-close" onClick={onClose} aria-label="Close map picker">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>

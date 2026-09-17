@@ -22,6 +22,8 @@ export default function Hero({ onTrack, loading, error }) {
     }
     didTrackRef.current = true;
     onTrack(input);
+    // Fix #8: clear input after submitting
+    setInput('');
   }
 
   function handleKey(e) {
