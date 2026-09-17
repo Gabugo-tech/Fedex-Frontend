@@ -440,6 +440,8 @@ a:hover { color: var(--orange); }
 .admin-back-link {
   display: inline-block; margin-top: 20px; font-size: 13px;
   color: var(--gray-400); transition: color 0.2s;
+  background: none; border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; padding: 0;
 }
 .admin-back-link:hover { color: var(--purple); }
 

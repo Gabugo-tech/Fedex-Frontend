@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { signIn } from '../api/auth';
 
-export default function AdminLogin({ onSuccess }) {
+export default function AdminLogin({ onSuccess, onCancel }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
@@ -40,6 +40,7 @@ export default function AdminLogin({ onSuccess }) {
               placeholder="admin@example.com"
               required
               autoComplete="email"
+              autoFocus
             />
           </div>
           <div className="form-group">
@@ -55,7 +56,7 @@ export default function AdminLogin({ onSuccess }) {
           </div>
 
           {error && (
-            <div className="admin-error-banner">
+            <div className="admin-error-banner" role="alert">
               <i className="fa-solid fa-triangle-exclamation"></i> {error}
             </div>
           )}
@@ -68,10 +69,9 @@ export default function AdminLogin({ onSuccess }) {
           </button>
         </form>
 
-        <a href="#" onClick={e => { e.preventDefault(); window.location.hash = ''; }}
-          className="admin-back-link">
+        <button className="admin-back-link" onClick={onCancel}>
           ← Back to tracking
-        </a>
+        </button>
       </div>
     </div>
   );
