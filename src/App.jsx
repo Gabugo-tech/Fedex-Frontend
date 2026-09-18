@@ -18,7 +18,9 @@ export default function App() {
   const [adminSession, setAdminSession] = useState(null);
   const [showSignIn, setShowSignIn]     = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [backedToSite, setBackedToSite] = useState(false);
+  const [backedToSite, setBackedToSite] = useState(
+    () => sessionStorage.getItem('gbt-backed') === 'true'
+  );
 
   useEffect(() => {
     getSession().then(session => {
@@ -53,6 +55,7 @@ export default function App() {
   function handleLoginSuccess(session) {
     setAdminSession(session);
     setBackedToSite(false);
+    sessionStorage.removeItem('gbt-backed');
     setShowSignIn(false);
   }
 
@@ -60,6 +63,7 @@ export default function App() {
     await signOut();
     setAdminSession(null);
     setBackedToSite(false);
+    sessionStorage.removeItem('gbt-backed');
     setResults([]);
     setHasSearched(false);
   }
@@ -67,6 +71,7 @@ export default function App() {
   function handleBackToSite() {
     setAdminSession(null);
     setBackedToSite(true);
+    sessionStorage.setItem('gbt-backed', 'true');
   }
 
   if (!sessionChecked) {

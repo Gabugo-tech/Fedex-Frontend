@@ -224,7 +224,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   }
 
   // ── RENDER ────────────────────────────────────────────
-  const shipmentForPicker = expandedData?.shipment;
 
   return (
     <div className="admin-layout">

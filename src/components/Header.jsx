@@ -58,11 +58,9 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
             <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
           </div>
           <nav className="nav">
-            <a href="#">Shipping</a>
-            <a href="#">Tracking</a>
-            <a href="#">Printing</a>
-            <a href="#">Locations</a>
-            <a href="#">{t.support}</a>
+            <a href="/">Home</a>
+            <a href="#results-anchor" onClick={e => { e.preventDefault(); document.getElementById('trackingInput')?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Track</a>
+            <a href="mailto:support@droppin-tracker.com">{t.support}</a>
           </nav>
           {user && (
             <div className="header-actions">
@@ -77,11 +75,9 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
 
         {/* Mobile Nav */}
         <div className={`mobile-nav ${menuOpen ? 'open' : ''}`}>
-          <a href="#">Shipping</a>
-          <a href="#">Tracking</a>
-          <a href="#">Printing</a>
-          <a href="#">Locations</a>
-          <a href="#">{t.support}</a>
+          <a href="/">Home</a>
+          <a href="#" onClick={e => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); document.getElementById('trackingInput')?.focus(); }}>Track</a>
+          <a href="mailto:support@droppin-tracker.com">{t.support}</a>
           {/* Mobile language switcher */}
           <div className="lang-switcher mobile">
             {Object.entries(LANGUAGES).map(([code, info]) => (
