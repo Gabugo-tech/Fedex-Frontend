@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="container footer-inner">
         <div className="footer-brand">
           <div className="logo small">
-            <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+            <span className="logo-pulse">Puls</span><span className="logo-track">Track</span>
           </div>
           <p>{t.footerTagline}</p>
           <div className="social-links">
@@ -37,14 +37,14 @@ export default function Footer() {
 
         <div className="footer-links">
           <h5>{t.footerServices}</h5>
-          <a href="/">GBT Express</a>
-          <a href="/">GBT Ground</a>
-          <a href="/">GBT International</a>
+          <a href="/">PulsTrack Express</a>
+          <a href="/">PulsTrack Ground</a>
+          <a href="/">PulsTrack International</a>
         </div>
 
         <div className="footer-links">
           <h5>{t.footerSupport}</h5>
-          <a href="mailto:support@fedex.com">{t.footerContact}</a>
+          <a href="mailto:support@pulstrack.com">{t.footerContact}</a>
           <a href="/">{t.footerFaq}</a>
           <a href="/">{t.footerAlerts}</a>
         </div>

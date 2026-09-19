@@ -59,14 +59,14 @@ const ko = {
   footerContact:    '문의하기',
   footerFaq:        '자주 묻는 질문',
   footerAlerts:     '서비스 공지',
-  footerCopy:       'FedEx Tracker. 모든 권리 보유.',
+  footerCopy:       'PulsTrack. 모든 권리 보유.',
   footerPrivacy:    '개인정보처리방침',
   footerTerms:      '이용약관',
   footerAccess:     '접근성',
 
   // Sign in modal
   signInTitle:   '로그인',
-  signInSub:     'FedEx 계정에 로그인하세요',
+  signInSub:     'PulsTrack 계정에 로그인하세요',
   emailLabel:    '이메일 주소',
   passwordLabel: '비밀번호',
   signingIn:     '로그인 중...',

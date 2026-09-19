@@ -19,7 +19,7 @@ export default function App() {
   const [showSignIn, setShowSignIn]     = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [backedToSite, setBackedToSite] = useState(
-    () => sessionStorage.getItem('gbt-backed') === 'true'
+    () => sessionStorage.getItem('plt-backed') === 'true'
   );
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function App() {
   function handleLoginSuccess(session) {
     setAdminSession(session);
     setBackedToSite(false);
-    sessionStorage.removeItem('gbt-backed');
+    sessionStorage.removeItem('plt-backed');
     setShowSignIn(false);
   }
 
@@ -63,7 +63,7 @@ export default function App() {
     await signOut();
     setAdminSession(null);
     setBackedToSite(false);
-    sessionStorage.removeItem('gbt-backed');
+    sessionStorage.removeItem('plt-backed');
     setResults([]);
     setHasSearched(false);
   }
@@ -71,7 +71,7 @@ export default function App() {
   function handleBackToSite() {
     setAdminSession(null);
     setBackedToSite(true);
-    sessionStorage.setItem('gbt-backed', 'true');
+    sessionStorage.setItem('plt-backed', 'true');
   }
 
   if (!sessionChecked) {

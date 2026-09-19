@@ -231,7 +231,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       {/* ── SIDEBAR ── */}
       <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="admin-logo">
-          <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+          <span className="logo-pulse">Puls</span><span className="logo-track">Track</span>
           <span className="admin-badge">Admin</span>
         </div>
 
@@ -264,7 +264,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
           <i className={`fa-solid ${sidebarOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
         </button>
         <div className="logo" style={{ fontSize: '22px', fontWeight: 900 }}>
-          <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+          <span className="logo-pulse">Puls</span><span className="logo-track">Track</span>
         </div>
         <button className="btn-admin-primary" style={{ padding: '7px 14px', fontSize: '13px' }} onClick={goToCreate}>
           <i className="fa-solid fa-plus"></i> New
@@ -528,7 +528,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                         </button>
                       )}
                     </div>
-                    <p className="field-hint">Auto-format: GBT-2026-XXXXXXXX</p>
+                    <p className="field-hint">Auto-format: PLT-2026-XXXXXXXX</p>
                   </div>
                   <div className="form-group">
                     <label>Service Type *</label>

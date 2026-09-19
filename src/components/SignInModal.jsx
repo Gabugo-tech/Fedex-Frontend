@@ -37,7 +37,7 @@ export default function SignInModal({ onSuccess, onClose }) {
         </button>
 
         <div className="modal-logo">
-          <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+          <span className="logo-pulse">Puls</span><span className="logo-track">Track</span>
         </div>
 
         <h2 id="signin-title" className="modal-title">{t.signInTitle}</h2>

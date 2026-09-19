@@ -67,8 +67,8 @@ a:hover { color: var(--orange); }
 }
 .logo { font-size: 36px; font-weight: 900; letter-spacing: -1px; flex-shrink: 0; }
 .logo.small { font-size: 28px; }
-.logo-fed { color: var(--purple); }
-.logo-ex  { color: var(--orange); }
+.logo-pulse { color: var(--purple); }
+.logo-track { color: var(--orange); }
 
 .nav { display: flex; gap: 28px; flex: 1; }
 .nav a {

@@ -59,14 +59,14 @@ const en = {
   footerContact:    'Contact Us',
   footerFaq:        'FAQs',
   footerAlerts:     'Service Alerts',
-  footerCopy:       'FedEx Tracker. All rights reserved.',
+  footerCopy:       'PulsTrack. All rights reserved.',
   footerPrivacy:    'Privacy Policy',
   footerTerms:      'Terms of Use',
   footerAccess:     'Accessibility',
 
   // Sign in modal
   signInTitle:   'Sign In',
-  signInSub:     'Access your FedEx account',
+  signInSub:     'Access your PulsTrack account',
   emailLabel:    'Email Address',
   passwordLabel: 'Password',
   signingIn:     'Signing in...',

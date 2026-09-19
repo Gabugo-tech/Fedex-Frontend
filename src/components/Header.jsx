@@ -55,12 +55,12 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
       <header className="header">
         <div className="container header-inner">
           <div className="logo">
-            <span className="logo-fed">Fed</span><span className="logo-ex">Ex</span>
+            <span className="logo-pulse">Puls</span><span className="logo-track">Track</span>
           </div>
           <nav className="nav">
             <a href="/">Home</a>
             <a href="#results-anchor" onClick={e => { e.preventDefault(); document.getElementById('trackingInput')?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Track</a>
-            <a href="mailto:support@droppin-tracker.com">{t.support}</a>
+            <a href="mailto:support@pulstrack.com">{t.support}</a>
           </nav>
           {user && (
             <div className="header-actions">
@@ -77,7 +77,7 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
         <div className={`mobile-nav ${menuOpen ? 'open' : ''}`}>
           <a href="/">Home</a>
           <a href="#" onClick={e => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); document.getElementById('trackingInput')?.focus(); }}>Track</a>
-          <a href="mailto:support@droppin-tracker.com">{t.support}</a>
+          <a href="mailto:support@pulstrack.com">{t.support}</a>
           {/* Mobile language switcher */}
           <div className="lang-switcher mobile">
             {Object.entries(LANGUAGES).map(([code, info]) => (
