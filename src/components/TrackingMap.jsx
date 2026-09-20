@@ -1,61 +1,81 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
-function loadLeaflet() {
-  return new Promise((resolve) => {
+// Fix #4: loadLeaflet returns a promise that can be cancelled externally
+function loadLeaflet(cancelRef) {
+  return new Promise((resolve, reject) => {
     if (!document.getElementById('leaflet-css')) {
       const link = Object.assign(document.createElement('link'), {
         id: 'leaflet-css', rel: 'stylesheet', href: LEAFLET_CSS,
       });
       document.head.appendChild(link);
     }
+
     if (window.L) return resolve();
+
     if (document.getElementById('leaflet-js')) {
+      // Fix #4: clear this interval when cancelled
       const wait = setInterval(() => {
-        if (window.L) { clearInterval(wait); resolve(); }
+        if (cancelRef.current) { clearInterval(wait); return reject(new Error('cancelled')); }
+        if (window.L)          { clearInterval(wait); resolve(); }
       }, 50);
       return;
     }
+
     const script = Object.assign(document.createElement('script'), {
       id: 'leaflet-js', src: LEAFLET_JS,
     });
-    script.onload = resolve;
+    script.onload  = () => { if (!cancelRef.current) resolve(); };
+    script.onerror = () => reject(new Error('Leaflet failed to load'));
     document.head.appendChild(script);
   });
 }
 
 /**
- * Build a smooth arc of `steps` points between two lat/lng coords.
- * Uses a quadratic bezier curve to simulate a flight path.
+ * Fix #6: Build a curved arc using a control point that curves
+ * perpendicular to the route midpoint, so east-west routes still arc.
  */
 function buildArc(lat1, lng1, lat2, lng2, steps = 120) {
   const points = [];
+  const midLat  = (lat1 + lat2) / 2;
+  const midLng  = (lng1 + lng2) / 2;
+  // Curve height = 15% of the straight-line distance, perpendicular to route
+  const dist    = Math.hypot(lat2 - lat1, lng2 - lng1);
+  const curveH  = dist * 0.18;
+  // Rotate 90° from route direction for the control point
+  const dx = lat2 - lat1, dy = lng2 - lng1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ctrlLat = midLat + (dy / len) * curveH;
+  const ctrlLng = midLng - (dx / len) * curveH;
+
   for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const midLat = (lat1 + lat2) / 2 + Math.abs(lat2 - lat1) * 0.25;
-    const midLng = (lng1 + lng2) / 2;
-    const lat = (1 - t) * (1 - t) * lat1 + 2 * (1 - t) * t * midLat + t * t * lat2;
-    const lng = (1 - t) * (1 - t) * lng1 + 2 * (1 - t) * t * midLng + t * t * lng2;
+    const t   = i / steps;
+    const lat = (1 - t) * (1 - t) * lat1 + 2 * (1 - t) * t * ctrlLat + t * t * lat2;
+    const lng = (1 - t) * (1 - t) * lng1 + 2 * (1 - t) * t * ctrlLng + t * t * lng2;
     points.push({ lat, lng });
   }
   return points;
 }
 
 /**
- * Calculate the geographic bearing (in degrees) from point A to point B.
- * Returns 0–360 where 0 = North, 90 = East, 180 = South, 270 = West.
+ * Correct geographic bearing from A to B (0 = North, 90 = East).
  */
 function getBearing(lat1, lng1, lat2, lng2) {
   const toRad = d => d * Math.PI / 180;
   const φ1 = toRad(lat1), φ2 = toRad(lat2);
   const Δλ = toRad(lng2 - lng1);
-  const x = Math.sin(Δλ) * Math.cos(φ2);
-  const y = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-  const bearing = Math.atan2(x, y) * 180 / Math.PI;
-  return (bearing + 360) % 360; // normalise to 0–360
+  const x  = Math.sin(Δλ) * Math.cos(φ2);
+  const y  = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(x, y) * 180 / Math.PI) + 360) % 360;
 }
+
+// Fix #1 & #2: hardcoded hex colours — no CSS variables inside Leaflet
+const PURPLE_HEX = '#4d148c';
+const ORANGE_HEX = '#ff6200';
+const GREEN_HEX  = '#00843d';
+const RED_HEX    = '#d0021b';
 
 export default function TrackingMap({
   lat, lng, label,
@@ -64,177 +84,195 @@ export default function TrackingMap({
   status,
   liveLabel,
 }) {
-  const mapRef      = useRef(null);
-  const instanceRef = useRef(null);
-  const animRef     = useRef(null);
+  const mapRef       = useRef(null);
+  const instanceRef  = useRef(null);
+  const animRef      = useRef(null);
+  const cancelledRef = useRef(false); // Fix #3 & #4
+  const [mapLoading, setMapLoading] = useState(true); // Fix #10
+
+  // Fix #8: memoize label so it doesn't re-trigger the effect on every render
+  const labelRef = useRef(label);
+  useEffect(() => { labelRef.current = label; }, [label]);
 
   useEffect(() => {
-    const hasRoute  = originLat && originLng && destLat && destLng;
-    const hasPos    = lat && lng;
-
-    // Need at least a route or a position
+    const hasRoute = originLat && originLng && destLat && destLng;
+    const hasPos   = lat && lng;
     if (!hasRoute && !hasPos) return;
 
-    let cancelled = false;
+    cancelledRef.current = false;
 
-    loadLeaflet().then(() => {
-      if (cancelled || !mapRef.current) return;
+    loadLeaflet(cancelledRef).then(() => {
+      if (cancelledRef.current || !mapRef.current) return;
 
-      // Clean up previous instance
+      // Tear down previous instance
       if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
       if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
 
       const L = window.L;
 
-      // ── MAP VIEW ──
-      // Center between origin and destination if we have a route
-      const centerLat = hasRoute ? (originLat + destLat) / 2 : lat;
-      const centerLng = hasRoute ? (originLng + destLng) / 2 : lng;
-      const zoom      = hasRoute ? 4 : 6;
-
+      // Fix #5: fit bounds to the route instead of fixed zoom
       const map = L.map(mapRef.current, {
         zoomControl: true,
         scrollWheelZoom: false,
         attributionControl: true,
-      }).setView([centerLat, centerLng], zoom);
+      });
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
       instanceRef.current = map;
+      setMapLoading(false); // Fix #10
 
       if (hasRoute) {
-        const arc = buildArc(originLat, originLng, destLat, destLng, 120);
+        const arc     = buildArc(originLat, originLng, destLat, destLng, 120);
         const latlngs = arc.map(p => [p.lat, p.lng]);
 
-        // Full route line (dashed grey)
+        // Fix #5: fit map to route bounds with padding
+        const bounds = L.latLngBounds([
+          [originLat, originLng],
+          [destLat,   destLng],
+        ]);
+        map.fitBounds(bounds, { padding: [40, 40] });
+
+        // Dashed route line
         L.polyline(latlngs, {
-          color: '#c0b0e0',
-          weight: 2.5,
+          color:     '#c0b0e0',
+          weight:    2.5,
           dashArray: '7 5',
-          opacity: 0.7,
+          opacity:   0.7,
         }).addTo(map);
 
-        // ── ORIGIN DOT ──
+        // Fix #9: consistent — use icons everywhere, no emoji in popups
+        // Origin dot
         L.marker([originLat, originLng], {
           icon: L.divIcon({
             className: '',
-            html: `<div class="map-origin-dot"></div>`,
+            html: `<div style="width:14px;height:14px;border-radius:50%;background:${GREEN_HEX};border:3px solid #fff;box-shadow:0 0 0 2px ${GREEN_HEX}"></div>`,
             iconSize: [14, 14], iconAnchor: [7, 7],
           }),
-        }).addTo(map).bindPopup('<strong>📦 Origin</strong>');
+        }).addTo(map).bindPopup('<strong>Origin</strong>');
 
-        // ── DESTINATION DOT ──
+        // Destination dot
         L.marker([destLat, destLng], {
           icon: L.divIcon({
             className: '',
-            html: `<div class="map-dest-dot"></div>`,
+            html: `<div style="width:14px;height:14px;border-radius:50%;background:${RED_HEX};border:3px solid #fff;box-shadow:0 0 0 2px ${RED_HEX}"></div>`,
             iconSize: [14, 14], iconAnchor: [7, 7],
           }),
-        }).addTo(map).bindPopup('<strong>🏠 Destination</strong>');
+        }).addTo(map).bindPopup('<strong>Destination</strong>');
 
-        // ── PACKAGE MARKER — starts at origin ──
+        // Plane marker
         const pkgIcon = L.divIcon({
           className: 'plane-marker-wrap',
           html: `<div class="plane-marker-inner">✈</div>`,
-          iconSize:    [36, 36],
-          iconAnchor:  [18, 18],
-          popupAnchor: [0, -18],
+          iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18],
         });
 
         const marker = L.marker([arc[0].lat, arc[0].lng], { icon: pkgIcon })
           .addTo(map)
-          .bindPopup(`<strong>${label || 'Package Location'}</strong>`);
+          .bindPopup(`<strong>${labelRef.current || 'Package Location'}</strong>`);
 
-        // Trailing "travelled" polyline (purple)
+        // Fix #1: use hardcoded hex for trail colour
         const trailLayer = L.polyline([], {
-          color: 'var(--purple)',
-          weight: 3,
-          opacity: 0.6,
+          color:   PURPLE_HEX,
+          weight:  3,
+          opacity: 0.65,
         }).addTo(map);
 
-        // ── ANIMATION ──
-        // For delivered packages: do a single pass showing the completed journey
-        // For all others: loop continuously so customers always see movement
         const isDelivered = status === 'delivered';
         let idx = 0;
 
-        // How fast the marker moves — slower = more realistic feeling
-        const STEP_MS   = isDelivered ? 40 : 80;  // ms per tick
-        const STEP_SIZE = 1;                        // arc points per tick
+        // Fix #7: use opacity fade instead of instant clear on loop reset
+        let fadeSteps = 0;
+        const FADE_STEPS = 15;
 
         animRef.current = setInterval(() => {
-          if (cancelled) { clearInterval(animRef.current); return; }
+          // Fix #3: properly guard against cancelled state
+          if (cancelledRef.current) {
+            clearInterval(animRef.current);
+            animRef.current = null;
+            return;
+          }
 
-          idx += STEP_SIZE;
+          idx += 1;
 
-          // Loop back to start for active shipments; stop at end for delivered
           if (idx > arc.length - 1) {
             if (isDelivered) {
               idx = arc.length - 1;
               clearInterval(animRef.current);
               animRef.current = null;
+              return;
             } else {
-              // Reset: restart from origin for continuous loop
-              idx = 0;
-              trailLayer.setLatLngs([]);
+              // Fix #7: graceful fade-out before reset
+              fadeSteps++;
+              trailLayer.setStyle({ opacity: Math.max(0, 0.65 - (fadeSteps / FADE_STEPS) * 0.65) });
+              if (fadeSteps >= FADE_STEPS) {
+                idx = 0;
+                fadeSteps = 0;
+                trailLayer.setLatLngs([]);
+                trailLayer.setStyle({ opacity: 0.65 });
+              }
+              return;
             }
           }
 
           const pos = arc[idx];
           marker.setLatLng([pos.lat, pos.lng]);
-
-          // Grow the trail behind the marker
           trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
 
           // Rotate plane to face direction of travel
-          // ✈ emoji points East by default, bearing 0 = North, so subtract 90°
           if (idx > 0) {
-            const prev = arc[idx - 1];
+            const prev      = arc[idx - 1];
             const bearing   = getBearing(prev.lat, prev.lng, pos.lat, pos.lng);
-            const rotateDeg = bearing - 90;
-            const el = marker.getElement();
+            const rotateDeg = bearing - 90; // ✈ points East by default
+            const el        = marker.getElement();
             if (el) {
-              const inner = el.querySelector('.plane-marker-inner');
+              const inner  = el.querySelector('.plane-marker-inner');
               const target = inner || el;
               target.style.transformOrigin = 'center center';
-              target.style.transform = `rotate(${rotateDeg}deg)`;
+              target.style.transform       = `rotate(${rotateDeg}deg)`;
             }
           }
-        }, STEP_MS);
+        }, isDelivered ? 40 : 80);
 
       } else if (hasPos) {
-        // No route data — just show a static pin at current position
-        const pkgIcon = L.divIcon({
-          className: '',
-          html: `<div class="map-pkg-marker"><i class="fa-solid fa-location-dot" style="color:var(--purple);font-size:28px;"></i></div>`,
-          iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
-        });
-        L.marker([lat, lng], { icon: pkgIcon })
-          .addTo(map)
-          .bindPopup(`<strong>${label || 'Package Location'}</strong>`)
+        map.setView([lat, lng], 7);
+        // Fix #2: hardcoded hex colour, no CSS variable
+        L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="font-size:28px;color:${PURPLE_HEX};filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));line-height:1">📍</div>`,
+            iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+          }),
+        }).addTo(map)
+          .bindPopup(`<strong>${labelRef.current || 'Package Location'}</strong>`)
           .openPopup();
       }
+    }).catch(() => {
+      // Silently ignore cancellation errors
     });
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
       if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
     };
-  }, [lat, lng, label, originLat, originLng, destLat, destLng, status]);
+    // Fix #8: label intentionally omitted from deps — accessed via ref
+  }, [lat, lng, originLat, originLng, destLat, destLng, status]);
 
-  // Show map if we have either a route or a position
   const canShow = (originLat && originLng && destLat && destLng) || (lat && lng);
   if (!canShow) return null;
 
   const isLive = status === 'in-transit' || status === 'out-delivery';
 
+  // Fix #11: liveLabel fallback comes from parent (already translated)
+  const mapTitle = liveLabel || 'Live Package Location';
+
   return (
     <div className="tracking-map-section">
       <h4>
-        <i className="fa-solid fa-location-dot"></i> {liveLabel || 'Live Package Location'}
+        <i className="fa-solid fa-location-dot"></i> {mapTitle}
         {isLive && (
           <span className="live-badge">
             <i className="fa-solid fa-circle"></i> LIVE
@@ -246,7 +284,22 @@ export default function TrackingMap({
           </span>
         )}
       </h4>
-      <div ref={mapRef} className="tracking-map"></div>
+
+      {/* Fix #10: loading placeholder while Leaflet loads */}
+      <div style={{ position: 'relative' }}>
+        {mapLoading && (
+          <div className="map-loading-placeholder">
+            <div className="spinner"></div>
+            <p>Loading map…</p>
+          </div>
+        )}
+        <div
+          ref={mapRef}
+          className="tracking-map"
+          style={{ visibility: mapLoading ? 'hidden' : 'visible' }}
+        ></div>
+      </div>
+
       <div className="tracking-map-legend">
         {originLat && (
           <>
@@ -256,7 +309,7 @@ export default function TrackingMap({
           </>
         )}
         <span className="tracking-map-label-text">
-          <i className="fa-solid fa-circle-dot" style={{ color: 'var(--orange)' }}></i> {label}
+          <i className="fa-solid fa-circle-dot" style={{ color: ORANGE_HEX }}></i> {label}
         </span>
       </div>
     </div>

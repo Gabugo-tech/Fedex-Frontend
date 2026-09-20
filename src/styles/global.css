@@ -1646,3 +1646,16 @@ a:hover { color: var(--orange); }
   .btn-share span { display: none; }
   .btn-copy span { display: none; }
 }
+
+/* ===== MAP LOADING PLACEHOLDER ===== */
+.map-loading-placeholder {
+  position: absolute; inset: 0; z-index: 10;
+  background: var(--gray-100);
+  border-radius: 10px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  height: 320px;
+}
+.map-loading-placeholder p {
+  font-size: 13px; color: var(--gray-400); font-weight: 500;
+}
