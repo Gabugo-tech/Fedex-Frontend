@@ -29,6 +29,19 @@ export default function App() {
       }
       setSessionChecked(true);
     }).catch(() => setSessionChecked(true));
+
+    // Auto-track if ?track=XXXX is in the URL
+    const params = new URLSearchParams(window.location.search);
+    const trackParam = params.get('track');
+    if (trackParam) {
+      setHasSearched(true);
+      setLoading(true);
+      fetchTracking(trackParam).then(data => {
+        setResults(data);
+      }).catch(err => {
+        setError(err.message || 'Something went wrong.');
+      }).finally(() => setLoading(false));
+    }
   }, []);
 
   async function handleTrack(numbersRaw) {

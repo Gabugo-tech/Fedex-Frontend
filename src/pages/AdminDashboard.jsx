@@ -3,6 +3,7 @@ import { signOut } from '../api/auth';
 import {
   getShipments, deleteShipment, updateLocation,
   addEvent, deleteEvent, createShipment, updateShipment, getShipment,
+  uploadImage, deleteImage,
 } from '../api/admin';
 import AdminMapPicker from '../components/AdminMapPicker';
 import { generateTrackingNumber } from '../utils/generateTrackingNumber';
@@ -48,8 +49,9 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [locationForm, setLocationForm]       = useState({ map_lat: '', map_lng: '', current_location: '' });
   const [saving, setSaving]                   = useState(false);
   const [toast, setToast]                     = useState(null);
-  const [mapPicker, setMapPicker]             = useState(null); // null | 'current' | 'origin' | 'dest' | 'location'
+  const [mapPicker, setMapPicker]             = useState(null);
   const [sidebarOpen, setSidebarOpen]         = useState(false);
+  const [imageUploading, setImageUploading]   = useState(false);
 
   useEffect(() => { loadShipments(); }, []);
 
@@ -206,6 +208,51 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     if (mapPicker === 'dest')     setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
     if (mapPicker === 'location') setLocationForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
     setMapPicker(null);
+  }
+
+  // ── IMAGE UPLOAD ─────────────────────────────────────
+  async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast_show('Only JPEG, PNG, WebP and GIF images are allowed', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast_show('Image must be under 5MB', 'error');
+      return;
+    }
+
+    setImageUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target.result.split(',')[1];
+        await uploadImage(expandedId, { base64, mimeType: file.type }, token);
+        toast_show('Image uploaded successfully');
+        loadExpanded(expandedId);
+        loadShipments();
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      toast_show(err.message, 'error');
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  async function handleImageDelete() {
+    if (!window.confirm('Remove this image?')) return;
+    try {
+      await deleteImage(expandedId, token);
+      toast_show('Image removed');
+      loadExpanded(expandedId);
+      loadShipments();
+    } catch (err) {
+      toast_show(err.message, 'error');
+    }
   }
 
   // ── NAV ───────────────────────────────────────────────
@@ -440,6 +487,57 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                             </div>
 
                             {/* BOTTOM: History */}
+                            <div className="expand-col expand-col-full">
+                              <h3 className="expand-col-title">
+                                <i className="fa-solid fa-image"></i> Item Image
+                                <span className="expand-col-desc-inline">Shown to customers when they track this shipment</span>
+                              </h3>
+                              <div className="image-upload-area">
+                                {expandedData.shipment?.item_image_url ? (
+                                  <div className="image-preview-wrap">
+                                    <img
+                                      src={expandedData.shipment.item_image_url}
+                                      alt="Item"
+                                      className="image-preview"
+                                    />
+                                    <button
+                                      className="btn-row-action btn-del-row"
+                                      onClick={handleImageDelete}
+                                      style={{ marginTop: '10px' }}
+                                    >
+                                      <i className="fa-solid fa-trash"></i>
+                                      <span>Remove Image</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label className="image-upload-label">
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/webp,image/gif"
+                                      onChange={handleImageUpload}
+                                      style={{ display: 'none' }}
+                                      disabled={imageUploading}
+                                    />
+                                    <div className="image-upload-placeholder">
+                                      {imageUploading ? (
+                                        <>
+                                          <i className="fa-solid fa-spinner fa-spin"></i>
+                                          <span>Uploading...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <i className="fa-solid fa-cloud-arrow-up"></i>
+                                          <span>Click to upload item photo</span>
+                                          <small>JPEG, PNG, WebP or GIF — max 5MB</small>
+                                        </>
+                                      )}
+                                    </div>
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* TRACKING HISTORY */}
                             <div className="expand-col expand-col-full">
                               <h3 className="expand-col-title">
                                 <i className="fa-solid fa-clock-rotate-left"></i> Tracking History

@@ -22,3 +22,5 @@ export const deleteShipment    = (id, token) => authFetch(`/api/admin/shipments/
 export const updateLocation    = (id, body, token) => authFetch(`/api/admin/shipments/${id}/location`, { method: 'PUT', body: JSON.stringify(body) }, token);
 export const addEvent          = (id, body, token) => authFetch(`/api/admin/shipments/${id}/events`, { method: 'POST', body: JSON.stringify(body) }, token);
 export const deleteEvent       = (id, token) => authFetch(`/api/admin/events/${id}`, { method: 'DELETE' }, token);
+export const uploadImage       = (id, body, token) => authFetch(`/api/admin/shipments/${id}/image`, { method: 'POST', body: JSON.stringify(body) }, token);
+export const deleteImage       = (id, token) => authFetch(`/api/admin/shipments/${id}/image`, { method: 'DELETE' }, token);

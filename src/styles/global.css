@@ -1573,3 +1573,76 @@ a:hover { color: var(--orange); }
   background: var(--purple); color: var(--white);
   border-color: var(--purple);
 }
+
+/* ===== IMAGE UPLOAD (Admin) ===== */
+.expand-col-desc-inline {
+  font-size: 11px; color: var(--gray-400); font-weight: 400;
+  margin-left: 8px; text-transform: none; letter-spacing: 0;
+}
+.image-upload-area { margin-top: 4px; }
+.image-upload-label { cursor: pointer; display: block; }
+.image-upload-placeholder {
+  border: 2px dashed var(--purple-light);
+  border-radius: 10px; padding: 32px 20px;
+  text-align: center; background: #f8f5ff;
+  transition: background 0.2s, border-color 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.image-upload-placeholder:hover {
+  background: #f0eaf9; border-color: var(--purple);
+}
+.image-upload-placeholder i {
+  font-size: 32px; color: var(--purple); display: block;
+}
+.image-upload-placeholder span {
+  font-size: 14px; font-weight: 600; color: var(--purple);
+}
+.image-upload-placeholder small {
+  font-size: 11px; color: var(--gray-400);
+}
+.image-preview-wrap {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+}
+.image-preview {
+  width: 100%; max-width: 320px; height: auto;
+  border-radius: 10px; border: 2px solid var(--gray-200);
+  box-shadow: var(--shadow); object-fit: cover;
+}
+
+/* ===== ITEM IMAGE (Customer ResultCard) ===== */
+.item-image-section {
+  padding: 20px 28px;
+  border-top: 1px solid var(--gray-200);
+}
+.item-image-section h4 {
+  font-size: 13px; font-weight: 700; color: var(--gray-400);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 7px;
+}
+.item-image {
+  width: 100%; max-width: 380px; height: auto;
+  border-radius: 10px; border: 2px solid var(--gray-200);
+  box-shadow: var(--shadow); object-fit: cover;
+  display: block;
+}
+
+/* ===== SHARE BUTTON ===== */
+.btn-share {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: var(--white); border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  font-family: 'Inter', sans-serif; transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-share:hover { background: rgba(255,255,255,0.22); }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .item-image { max-width: 100%; }
+  .image-preview { max-width: 100%; }
+  .btn-share span { display: none; }
+  .btn-copy span { display: none; }
+}

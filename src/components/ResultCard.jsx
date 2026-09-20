@@ -20,7 +20,8 @@ const STATUS_ICON = {
 
 export default function ResultCard({ result, steps }) {
   const { t } = useLang();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]       = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
   const hasMap = (result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng)
@@ -30,6 +31,14 @@ export default function ResultCard({ result, steps }) {
     navigator.clipboard.writeText(result.tracking_number).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function shareLink() {
+    const url = `${window.location.origin}/?track=${encodeURIComponent(result.tracking_number)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
     });
   }
 
@@ -45,6 +54,10 @@ export default function ResultCard({ result, steps }) {
             <button className="btn-copy" onClick={copyTracking} title={t.copy}>
               <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`}></i>
               <span>{copied ? t.copied : t.copy}</span>
+            </button>
+            <button className="btn-share" onClick={shareLink} title="Share tracking link">
+              <i className={`fa-solid ${linkCopied ? 'fa-check' : 'fa-share-nodes'}`}></i>
+              <span>{linkCopied ? 'Link Copied!' : 'Share'}</span>
             </button>
           </div>
           <div className="tracking-service-badge">
@@ -114,6 +127,18 @@ export default function ResultCard({ result, steps }) {
           </div>
         )}
       </div>
+
+      {/* ── ITEM IMAGE ── */}
+      {result.item_image_url && (
+        <div className="item-image-section">
+          <h4><i className="fa-solid fa-image"></i> Item Photo</h4>
+          <img
+            src={result.item_image_url}
+            alt="Shipment item"
+            className="item-image"
+          />
+        </div>
+      )}
 
       {/* ── LIVE MAP ── */}
       {hasMap && (
