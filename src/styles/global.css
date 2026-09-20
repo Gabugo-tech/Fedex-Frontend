@@ -1672,3 +1672,37 @@ a:hover { color: var(--orange); }
   display: flex; align-items: center; gap: 5px;
   font-size: 12px; color: var(--orange); font-weight: 600;
 }
+
+/* ===== AUTO-GEOCODE STATUS ===== */
+.geo-status {
+  font-size: 11px; font-weight: 600; margin-left: 8px;
+  text-transform: none; letter-spacing: 0;
+}
+.geo-status.loading { color: var(--orange); }
+.geo-status.ok      { color: var(--green); }
+.geo-status.error   { color: var(--red); }
+
+/* ===== MAP AUTO-SYNC STATUS ===== */
+.map-auto-status {
+  display: flex; align-items: center; gap: 12px;
+  background: #f8f5ff; border: 1px solid #e0d5f5;
+  border-radius: 10px; padding: 16px; flex-wrap: wrap;
+}
+.map-auto-item {
+  display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 180px;
+}
+.map-auto-item.ready .map-auto-value { color: var(--green); font-weight: 600; }
+.map-auto-item.waiting .map-auto-value { color: var(--gray-400); font-style: italic; }
+.map-auto-label {
+  font-size: 11px; font-weight: 700; color: var(--gray-600);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+}
+.map-auto-value { font-size: 12px; }
+.map-auto-arrow {
+  font-size: 20px; color: var(--purple); font-weight: 700;
+  align-self: center; flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .map-auto-arrow { display: none; }
+  .map-auto-status { flex-direction: column; }
+}

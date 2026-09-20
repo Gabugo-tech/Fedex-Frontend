@@ -53,6 +53,42 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [mapPicker, setMapPicker]             = useState(null);
   const [sidebarOpen, setSidebarOpen]         = useState(false);
   const [imageUploading, setImageUploading]   = useState(false);
+  const [geoStatus, setGeoStatus]             = useState({ origin: '', dest: '' });
+  const geocodeTimers                         = useRef({});
+
+  // ── AUTO-GEOCODE ──────────────────────────────────────
+  // Called when origin or destination text changes.
+  // Waits 800ms after the user stops typing then geocodes silently.
+  function scheduleGeocode(field, value) {
+    clearTimeout(geocodeTimers.current[field]);
+    if (!value.trim() || value.trim().length < 4) return;
+
+    geocodeTimers.current[field] = setTimeout(async () => {
+      setGeoStatus(s => ({ ...s, [field]: 'loading' }));
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        if (data.length === 0) {
+          setGeoStatus(s => ({ ...s, [field]: 'notfound' }));
+          return;
+        }
+        const lat = parseFloat(parseFloat(data[0].lat).toFixed(6));
+        const lng = parseFloat(parseFloat(data[0].lon).toFixed(6));
+
+        if (field === 'origin') {
+          setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
+        } else {
+          setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
+        }
+        setGeoStatus(s => ({ ...s, [field]: 'ok' }));
+      } catch {
+        setGeoStatus(s => ({ ...s, [field]: 'error' }));
+      }
+    }, 800);
+  }
 
   useEffect(() => { loadShipments(); }, []);
 
@@ -664,18 +700,51 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                   <span className="form-step-num">3</span>
                   Route
                 </div>
+                <p className="section-desc">
+                  Type the city or address — coordinates are looked up automatically.
+                </p>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Pickup City / Origin *</label>
+                    <label>
+                      Pickup City / Origin *
+                      {geoStatus.origin === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Looking up…</span>}
+                      {geoStatus.origin === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Location found</span>}
+                      {geoStatus.origin === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
+                      {geoStatus.origin === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
+                    </label>
                     <input type="text" placeholder="e.g. Los Angeles, CA"
                       value={form.origin} required
-                      onChange={e => setForm(f => ({ ...f, origin: e.target.value }))} />
+                      onChange={e => {
+                        setForm(f => ({ ...f, origin: e.target.value }));
+                        scheduleGeocode('origin', e.target.value);
+                      }} />
+                    {form.origin_lat && form.origin_lng && (
+                      <p className="coords-preview">
+                        <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
+                        &nbsp;{parseFloat(form.origin_lat).toFixed(4)}, {parseFloat(form.origin_lng).toFixed(4)}
+                      </p>
+                    )}
                   </div>
                   <div className="form-group">
-                    <label>Delivery Address / Destination *</label>
+                    <label>
+                      Delivery Address / Destination *
+                      {geoStatus.dest === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Looking up…</span>}
+                      {geoStatus.dest === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Location found</span>}
+                      {geoStatus.dest === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
+                      {geoStatus.dest === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
+                    </label>
                     <input type="text" placeholder="e.g. New York, NY 10001"
                       value={form.destination} required
-                      onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} />
+                      onChange={e => {
+                        setForm(f => ({ ...f, destination: e.target.value }));
+                        scheduleGeocode('dest', e.target.value);
+                      }} />
+                    {form.dest_lat && form.dest_lng && (
+                      <p className="coords-preview">
+                        <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
+                        &nbsp;{parseFloat(form.dest_lat).toFixed(4)}, {parseFloat(form.dest_lng).toFixed(4)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="form-group">
@@ -755,52 +824,46 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               <div className="form-section">
                 <div className="form-section-title">
                   <span className="form-step-num">5</span>
-                  Live Map Setup
+                  Live Map
                 </div>
                 <p className="section-desc">
-                  Set the map coordinates so customers can see the package moving on a live map.
+                  Map coordinates are set automatically from the Origin and Destination you typed above.
                 </p>
 
-                <div className="map-setup-grid">
-                  <div className="map-setup-item">
-                    <div className="map-setup-label">
-                      <span className="map-dot origin"></span> Pickup Location
+                <div className="map-auto-status">
+                  <div className={`map-auto-item ${form.origin_lat ? 'ready' : 'waiting'}`}>
+                    <span className="map-dot origin"></span>
+                    <div>
+                      <div className="map-auto-label">Pickup Location</div>
+                      <div className="map-auto-value">
+                        {form.origin_lat
+                          ? `✓ ${parseFloat(form.origin_lat).toFixed(4)}, ${parseFloat(form.origin_lng).toFixed(4)}`
+                          : 'Will sync when you type Origin above'}
+                      </div>
                     </div>
-                    <button type="button" className="btn-map-pick-simple"
-                      onClick={() => setMapPicker('origin')}>
-                      <i className="fa-solid fa-map-location-dot"></i>
-                      {form.origin_lat
-                        ? `✓ Set (${parseFloat(form.origin_lat).toFixed(3)}, ${parseFloat(form.origin_lng).toFixed(3)})`
-                        : 'Click to set on map'}
-                    </button>
                   </div>
 
-                  <div className="map-setup-item">
-                    <div className="map-setup-label">
-                      <span className="map-dot pkg"></span> Current Position
-                    </div>
-                    <button type="button" className="btn-map-pick-simple"
-                      onClick={() => setMapPicker('current')}>
-                      <i className="fa-solid fa-map-location-dot"></i>
-                      {form.map_lat
-                        ? `✓ Set (${parseFloat(form.map_lat).toFixed(3)}, ${parseFloat(form.map_lng).toFixed(3)})`
-                        : 'Click to set on map'}
-                    </button>
-                  </div>
+                  <div className="map-auto-arrow">→</div>
 
-                  <div className="map-setup-item">
-                    <div className="map-setup-label">
-                      <span className="map-dot dest"></span> Delivery Destination
+                  <div className={`map-auto-item ${form.dest_lat ? 'ready' : 'waiting'}`}>
+                    <span className="map-dot dest"></span>
+                    <div>
+                      <div className="map-auto-label">Delivery Destination</div>
+                      <div className="map-auto-value">
+                        {form.dest_lat
+                          ? `✓ ${parseFloat(form.dest_lat).toFixed(4)}, ${parseFloat(form.dest_lng).toFixed(4)}`
+                          : 'Will sync when you type Destination above'}
+                      </div>
                     </div>
-                    <button type="button" className="btn-map-pick-simple"
-                      onClick={() => setMapPicker('dest')}>
-                      <i className="fa-solid fa-map-location-dot"></i>
-                      {form.dest_lat
-                        ? `✓ Set (${parseFloat(form.dest_lat).toFixed(3)}, ${parseFloat(form.dest_lng).toFixed(3)})`
-                        : 'Click to set on map'}
-                    </button>
                   </div>
                 </div>
+
+                {form.origin_lat && form.dest_lat && (
+                  <p className="field-hint" style={{ marginTop: '12px', color: 'var(--green)' }}>
+                    <i className="fa-solid fa-check-circle"></i> Both coordinates detected — the animated map will show automatically on the tracking page.
+                  </p>
+                )}
+              </div>
               </div>
 
               {/* ── FORM ACTIONS ── */}
