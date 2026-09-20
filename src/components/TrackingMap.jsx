@@ -136,9 +136,11 @@ export default function TrackingMap({
 
         // ── PACKAGE MARKER — starts at origin ──
         const pkgIcon = L.divIcon({
-          className: '',
-          html: `<div class="map-pkg-marker"><i class="fa-solid fa-plane" style="color:var(--purple);font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35))"></i></div>`,
-          iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16],
+          className: 'plane-marker-wrap',
+          html: `<div class="plane-marker-inner">✈</div>`,
+          iconSize:    [36, 36],
+          iconAnchor:  [18, 18],
+          popupAnchor: [0, -18],
         });
 
         const marker = L.marker([arc[0].lat, arc[0].lng], { icon: pkgIcon })
@@ -186,18 +188,18 @@ export default function TrackingMap({
           // Grow the trail behind the marker
           trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
 
-          // Rotate plane icon to face direction of travel
-          // fa-plane points East (right) by default, so bearing 0 (North) needs -90° offset
+          // Rotate plane to face direction of travel
+          // ✈ emoji points East by default, bearing 0 = North, so subtract 90°
           if (idx > 0) {
             const prev = arc[idx - 1];
-            const bearing = getBearing(prev.lat, prev.lng, pos.lat, pos.lng);
-            // bearing 0 = North, icon default = East, so subtract 90
+            const bearing   = getBearing(prev.lat, prev.lng, pos.lat, pos.lng);
             const rotateDeg = bearing - 90;
             const el = marker.getElement();
             if (el) {
-              // Replace transform entirely — never accumulate
-              el.style.transformOrigin = 'center center';
-              el.style.transform = `rotate(${rotateDeg}deg)`;
+              const inner = el.querySelector('.plane-marker-inner');
+              const target = inner || el;
+              target.style.transformOrigin = 'center center';
+              target.style.transform = `rotate(${rotateDeg}deg)`;
             }
           }
         }, STEP_MS);
