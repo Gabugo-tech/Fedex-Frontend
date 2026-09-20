@@ -152,6 +152,8 @@ export default function ResultCard({ result, steps }) {
           destLng={result.dest_lng ? parseFloat(result.dest_lng) : null}
           status={result.status}
           liveLabel={t.liveLocation}
+          pickupTime={result.pickup_time || null}
+          deliveryTime={result.delivery_time || null}
         />
       )}
 

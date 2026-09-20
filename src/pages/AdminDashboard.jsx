@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   map_lat: '', map_lng: '',
   origin_lat: '', origin_lng: '',
   dest_lat: '',  dest_lng: '',
+  pickup_time: '', delivery_time: '',
 };
 
 const makeEmptyEvent = () => ({
@@ -146,6 +147,8 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       origin_lng:      s.origin_lng || '',
       dest_lat:        s.dest_lat   || '',
       dest_lng:        s.dest_lng   || '',
+      pickup_time:     s.pickup_time   ? s.pickup_time.slice(0, 16)   : '',
+      delivery_time:   s.delivery_time ? s.delivery_time.slice(0, 16) : '',
     });
     setEditingShipment(s);
     setView('form');
@@ -703,6 +706,31 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                       onChange={e => setForm(f => ({ ...f, estimated_delivery: e.target.value }))} />
                   </div>
                 </div>
+
+                {/* Real-time map timing */}
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>
+                      Pickup Date &amp; Time
+                      <span className="optional"> — for live map tracking</span>
+                    </label>
+                    <input type="datetime-local"
+                      value={form.pickup_time || ''}
+                      onChange={e => setForm(f => ({ ...f, pickup_time: e.target.value || null }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>
+                      Expected Delivery Date &amp; Time
+                      <span className="optional"> — for live map tracking</span>
+                    </label>
+                    <input type="datetime-local"
+                      value={form.delivery_time || ''}
+                      onChange={e => setForm(f => ({ ...f, delivery_time: e.target.value || null }))} />
+                  </div>
+                </div>
+                <p className="field-hint" style={{ marginTop: '-8px' }}>
+                  <i className="fa-solid fa-circle-info"></i> When both are set, the plane on the map moves automatically based on the real clock — no manual updates needed.
+                </p>
 
                 {/* Only show if status is delivered */}
                 {form.status === 'delivered' && (

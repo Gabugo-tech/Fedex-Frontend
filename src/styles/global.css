@@ -1659,3 +1659,16 @@ a:hover { color: var(--orange); }
 .map-loading-placeholder p {
   font-size: 13px; color: var(--gray-400); font-weight: 500;
 }
+
+/* ===== TIME REMAINING BADGE ===== */
+.time-remaining-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.15);
+  color: var(--white); font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 50px; margin-left: 10px;
+  vertical-align: middle; letter-spacing: 0.3px;
+}
+.legend-realtime {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--orange); font-weight: 600;
+}
