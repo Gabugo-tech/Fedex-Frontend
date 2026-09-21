@@ -821,12 +821,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                     )}
                   </div>
                 </div>
-                <div className="form-group">
-                  <label>Where is the package right now? *</label>
-                  <input type="text" placeholder="e.g. Memphis, TN — Sorting Facility"
-                    value={form.current_location} required
-                    onChange={e => setForm(f => ({ ...f, current_location: e.target.value }))} />
-                </div>
               </div>
 
               {/* ── SECTION 4: Package Details ── */}
@@ -841,12 +835,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                     <input type="text" placeholder="e.g. 2.4 lbs"
                       value={form.weight}
                       onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Estimated Delivery Date <span className="optional">(optional)</span></label>
-                    <input type="text" placeholder="e.g. September 18, 2026"
-                      value={form.estimated_delivery}
-                      onChange={e => setForm(f => ({ ...f, estimated_delivery: e.target.value }))} />
                   </div>
                 </div>
 
