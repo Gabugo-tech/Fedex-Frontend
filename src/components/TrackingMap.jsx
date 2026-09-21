@@ -249,93 +249,75 @@ export default function TrackingMap({
           rotatePlane(getBearing(originLat, originLng, destLat, destLng));
         }
 
-        // ── REAL-TIME MODE ─────────────────────────────────────
-        if (hasTimeWindow) {
-          // Immediately position plane on first render
-          const initialFrac = getJourneyFraction(pickupTime, deliveryTime);
-          if (initialFrac !== null && initialFrac > 0) {
-            const initialPos = interpolateArc(arc, initialFrac);
-            marker.setLatLng([initialPos.lat, initialPos.lng]);
-            trailLayer.setLatLngs(arc.slice(0, initialPos.idx + 1).map(p => [p.lat, p.lng]));
-            if (initialPos.idx > 0) {
-              const prev = arc[initialPos.idx - 1];
-              rotatePlane(getBearing(prev.lat, prev.lng, initialPos.lat, initialPos.lng));
+        // ── ANIMATION ──────────────────────────────────────────
+        // Always animate smoothly (loop). If real-time window is set,
+        // snap to the correct real-time position every second as well.
+        const isDelivered = status === 'delivered';
+        let idx       = startPos.idx;
+        let fadeSteps = 0;
+        const FADE_STEPS = 20;
+        const STEP_MS    = isDelivered ? 50 : 120;
+
+        animRef.current = setInterval(() => {
+          if (cancelledRef.current) {
+            clearInterval(animRef.current); animRef.current = null; return;
+          }
+
+          // If real-time window is valid, override position with clock-based position
+          if (hasTimeWindow) {
+            const frac = getJourneyFraction(pickupTime, deliveryTime);
+            if (frac !== null && frac < 1) {
+              const pos = interpolateArc(arc, frac);
+              // Only update idx if it differs, to avoid jitter
+              if (pos.idx !== idx) {
+                idx = pos.idx;
+                marker.setLatLng([pos.lat, pos.lng]);
+                trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
+                if (idx > 0) {
+                  const prev = arc[idx - 1];
+                  rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
+                }
+              }
             }
           }
 
-          animRef.current = setInterval(() => {
-            if (cancelledRef.current) {
+          // Always step forward for visible movement
+          idx += 1;
+
+          if (idx > arc.length - 1) {
+            if (isDelivered) {
+              idx = arc.length - 1;
               clearInterval(animRef.current); animRef.current = null; return;
-            }
-
-            const frac = getJourneyFraction(pickupTime, deliveryTime);
-            if (frac === null) return;
-
-            const pos = interpolateArc(arc, frac);
-            marker.setLatLng([pos.lat, pos.lng]);
-            const trail = arc.slice(0, pos.idx + 1).map(p => [p.lat, p.lng]);
-            trailLayer.setLatLngs(trail);
-
-            if (pos.idx > 0) {
-              const prev = arc[pos.idx - 1];
-              rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
-            }
-
-            if (frac >= 1) {
-              clearInterval(animRef.current); animRef.current = null;
-            }
-          }, 1000);
-
-        // ── LOOP ANIMATION MODE ─────────────────────────────────
-        } else {
-          const isDelivered = status === 'delivered';
-          let idx       = startPos.idx;
-          let fadeSteps = 0;
-          const FADE_STEPS = 20;
-          // Bug fix #3: slower speed — 150ms per step = ~30s per loop
-          const STEP_MS = isDelivered ? 50 : 150;
-
-          animRef.current = setInterval(() => {
-            if (cancelledRef.current) {
-              clearInterval(animRef.current); animRef.current = null; return;
-            }
-
-            idx += 1;
-
-            if (idx > arc.length - 1) {
-              if (isDelivered) {
-                idx = arc.length - 1;
-                clearInterval(animRef.current); animRef.current = null; return;
-              } else {
-                // Bug fix #3 & #5: fade trail, then reset properly
-                fadeSteps++;
-                trailLayer.setStyle({
-                  opacity: Math.max(0, 0.7 - (fadeSteps / FADE_STEPS) * 0.7),
-                });
-                if (fadeSteps >= FADE_STEPS) {
+            } else {
+              fadeSteps++;
+              trailLayer.setStyle({
+                opacity: Math.max(0, 0.7 - (fadeSteps / FADE_STEPS) * 0.7),
+              });
+              if (fadeSteps >= FADE_STEPS) {
+                // If real-time window is set, restart from real position
+                if (hasTimeWindow) {
+                  const frac = getJourneyFraction(pickupTime, deliveryTime);
+                  idx = frac !== null ? Math.floor(frac * (arc.length - 1)) : 0;
+                } else {
                   idx = 0;
-                  fadeSteps = 0;
-                  trailLayer.setLatLngs([]);
-                  trailLayer.setStyle({ opacity: 0.7 });
-                  // Bug fix #5: set correct initial rotation at idx=0
-                  rotatePlane(getBearing(originLat, originLng, destLat, destLng));
                 }
-                return;
+                fadeSteps = 0;
+                trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
+                trailLayer.setStyle({ opacity: 0.7 });
+                rotatePlane(getBearing(originLat, originLng, destLat, destLng));
               }
+              return;
             }
+          }
 
-            const pos = arc[idx];
-            marker.setLatLng([pos.lat, pos.lng]);
-
-            // Bug fix #4: addLatLng instead of rebuilding whole array
-            trailLayer.addLatLng([pos.lat, pos.lng]);
-
-            if (idx > 0) {
-              const prev = arc[idx - 1];
-              rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
-            }
-          }, STEP_MS);
-        }
+          const pos = arc[idx];
+          marker.setLatLng([pos.lat, pos.lng]);
+          trailLayer.addLatLng([pos.lat, pos.lng]);
+          if (idx > 0) {
+            const prev = arc[idx - 1];
+            rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
+          }
+        }, STEP_MS);
 
       } else if (hasPos) {
         map.setView([lat, lng], 7);
