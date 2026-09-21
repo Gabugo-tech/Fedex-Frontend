@@ -54,40 +54,57 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [sidebarOpen, setSidebarOpen]         = useState(false);
   const [imageUploading, setImageUploading]   = useState(false);
   const [geoStatus, setGeoStatus]             = useState({ origin: '', dest: '' });
+  const [geoResults, setGeoResults]           = useState({ origin: [], dest: [] });
+  const [geoConfirmed, setGeoConfirmed]       = useState({ origin: '', dest: '' });
   const geocodeTimers                         = useRef({});
 
-  // ── AUTO-GEOCODE ──────────────────────────────────────
-  // Called when origin or destination text changes.
-  // Waits 800ms after the user stops typing then geocodes silently.
+  // ── AUTO-GEOCODE with dropdown picker ────────────────
   function scheduleGeocode(field, value) {
     clearTimeout(geocodeTimers.current[field]);
-    if (!value.trim() || value.trim().length < 4) return;
+    // Clear results if input is too short
+    if (!value.trim() || value.trim().length < 3) {
+      setGeoResults(r => ({ ...r, [field]: [] }));
+      setGeoStatus(s => ({ ...s, [field]: '' }));
+      return;
+    }
 
     geocodeTimers.current[field] = setTimeout(async () => {
       setGeoStatus(s => ({ ...s, [field]: 'loading' }));
+      setGeoResults(r => ({ ...r, [field]: [] }));
       try {
         const res  = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=1`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
           { headers: { 'Accept-Language': 'en' } }
         );
         const data = await res.json();
         if (data.length === 0) {
           setGeoStatus(s => ({ ...s, [field]: 'notfound' }));
-          return;
-        }
-        const lat = parseFloat(parseFloat(data[0].lat).toFixed(6));
-        const lng = parseFloat(parseFloat(data[0].lon).toFixed(6));
-
-        if (field === 'origin') {
-          setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
         } else {
-          setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
+          setGeoResults(r => ({ ...r, [field]: data }));
+          setGeoStatus(s => ({ ...s, [field]: 'choose' }));
         }
-        setGeoStatus(s => ({ ...s, [field]: 'ok' }));
       } catch {
         setGeoStatus(s => ({ ...s, [field]: 'error' }));
       }
-    }, 800);
+    }, 700);
+  }
+
+  // Called when admin clicks a result from the dropdown
+  function handleGeoSelect(field, result) {
+    const lat = parseFloat(parseFloat(result.lat).toFixed(6));
+    const lng = parseFloat(parseFloat(result.lon).toFixed(6));
+    const name = result.display_name;
+
+    if (field === 'origin') {
+      setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
+    } else {
+      setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
+    }
+    // Close the dropdown
+    setGeoResults(r => ({ ...r, [field]: [] }));
+    setGeoStatus(s => ({ ...s, [field]: 'ok' }));
+    // Store the confirmed display name for reference
+    setGeoConfirmed(c => ({ ...c, [field]: name }));
   }
 
   useEffect(() => {
@@ -719,45 +736,78 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                   Type the city or address — coordinates are looked up automatically.
                 </p>
                 <div className="form-row">
-                  <div className="form-group">
+                  <div className="form-group" style={{ position: 'relative' }}>
                     <label>
                       Pickup City / Origin *
-                      {geoStatus.origin === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Looking up…</span>}
-                      {geoStatus.origin === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Location found</span>}
+                      {geoStatus.origin === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching…</span>}
+                      {geoStatus.origin === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Confirmed</span>}
                       {geoStatus.origin === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
                       {geoStatus.origin === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
+                      {geoStatus.origin === 'choose'  && <span className="geo-status loading"><i className="fa-solid fa-hand-pointer"></i> Select a result below</span>}
                     </label>
                     <input type="text" placeholder="e.g. Los Angeles, CA"
                       value={form.origin} required
+                      autoComplete="off"
                       onChange={e => {
-                        setForm(f => ({ ...f, origin: e.target.value }));
+                        setForm(f => ({ ...f, origin: e.target.value, origin_lat: '', origin_lng: '' }));
+                        setGeoConfirmed(c => ({ ...c, origin: '' }));
+                        setGeoStatus(s => ({ ...s, origin: '' }));
                         scheduleGeocode('origin', e.target.value);
                       }} />
-                    {form.origin_lat && form.origin_lng && (
+                    {/* Dropdown results */}
+                    {geoResults.origin.length > 0 && (
+                      <ul className="geo-dropdown">
+                        {geoResults.origin.map(r => (
+                          <li key={r.place_id} onClick={() => handleGeoSelect('origin', r)}>
+                            <i className="fa-solid fa-location-dot"></i>
+                            <span>{r.display_name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {geoStatus.origin === 'ok' && geoConfirmed.origin && (
                       <p className="coords-preview">
                         <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
-                        &nbsp;{parseFloat(form.origin_lat).toFixed(4)}, {parseFloat(form.origin_lng).toFixed(4)}
+                        &nbsp;{geoConfirmed.origin.split(',').slice(0, 3).join(',')}
+                        &nbsp;· {parseFloat(form.origin_lat).toFixed(4)}, {parseFloat(form.origin_lng).toFixed(4)}
                       </p>
                     )}
                   </div>
-                  <div className="form-group">
+
+                  <div className="form-group" style={{ position: 'relative' }}>
                     <label>
                       Delivery Address / Destination *
-                      {geoStatus.dest === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Looking up…</span>}
-                      {geoStatus.dest === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Location found</span>}
+                      {geoStatus.dest === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching…</span>}
+                      {geoStatus.dest === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Confirmed</span>}
                       {geoStatus.dest === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
                       {geoStatus.dest === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
+                      {geoStatus.dest === 'choose'  && <span className="geo-status loading"><i className="fa-solid fa-hand-pointer"></i> Select a result below</span>}
                     </label>
                     <input type="text" placeholder="e.g. New York, NY 10001"
                       value={form.destination} required
+                      autoComplete="off"
                       onChange={e => {
-                        setForm(f => ({ ...f, destination: e.target.value }));
+                        setForm(f => ({ ...f, destination: e.target.value, dest_lat: '', dest_lng: '' }));
+                        setGeoConfirmed(c => ({ ...c, dest: '' }));
+                        setGeoStatus(s => ({ ...s, dest: '' }));
                         scheduleGeocode('dest', e.target.value);
                       }} />
-                    {form.dest_lat && form.dest_lng && (
+                    {/* Dropdown results */}
+                    {geoResults.dest.length > 0 && (
+                      <ul className="geo-dropdown">
+                        {geoResults.dest.map(r => (
+                          <li key={r.place_id} onClick={() => handleGeoSelect('dest', r)}>
+                            <i className="fa-solid fa-location-dot"></i>
+                            <span>{r.display_name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {geoStatus.dest === 'ok' && geoConfirmed.dest && (
                       <p className="coords-preview">
                         <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
-                        &nbsp;{parseFloat(form.dest_lat).toFixed(4)}, {parseFloat(form.dest_lng).toFixed(4)}
+                        &nbsp;{geoConfirmed.dest.split(',').slice(0, 3).join(',')}
+                        &nbsp;· {parseFloat(form.dest_lat).toFixed(4)}, {parseFloat(form.dest_lng).toFixed(4)}
                       </p>
                     )}
                   </div>

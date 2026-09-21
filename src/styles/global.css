@@ -1706,3 +1706,35 @@ a:hover { color: var(--orange); }
   .map-auto-arrow { display: none; }
   .map-auto-status { flex-direction: column; }
 }
+
+/* ===== GEO DROPDOWN PICKER ===== */
+.geo-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  list-style: none;
+  margin: 0; padding: 4px 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.geo-dropdown li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px; color: var(--gray-800);
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background 0.15s;
+  line-height: 1.4;
+}
+.geo-dropdown li:last-child { border-bottom: none; }
+.geo-dropdown li:hover { background: #f0eaf9; color: var(--purple); }
+.geo-dropdown li i {
+  color: var(--orange); font-size: 13px;
+  margin-top: 2px; flex-shrink: 0;
+}
+.geo-dropdown li span { flex: 1; }
