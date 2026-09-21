@@ -1738,3 +1738,12 @@ a:hover { color: var(--orange); }
   margin-top: 2px; flex-shrink: 0;
 }
 .geo-dropdown li span { flex: 1; }
+
+/* ===== ITEM NAME IN RESULT CARD ===== */
+.tracking-item-name {
+  font-size: 15px; font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 7px;
+}
+.tracking-item-name i { color: var(--orange); }

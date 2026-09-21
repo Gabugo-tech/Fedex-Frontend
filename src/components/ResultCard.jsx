@@ -60,6 +60,11 @@ export default function ResultCard({ result, steps }) {
               <span>{linkCopied ? 'Link Copied!' : 'Share'}</span>
             </button>
           </div>
+          {result.item_name && (
+            <div className="tracking-item-name">
+              <i className="fa-solid fa-tag"></i> {result.item_name}
+            </div>
+          )}
           <div className="tracking-service-badge">
             <i className="fa-solid fa-box"></i> {result.service}
             {result.weight && (

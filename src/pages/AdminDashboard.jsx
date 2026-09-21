@@ -21,6 +21,7 @@ const EMPTY_FORM = {
   tracking_number: '', service: 'PulsTrack Express',
   status: 'in-transit', status_label: 'In Transit',
   status_icon: 'fa-plane', progress_step: 2,
+  item_name: '',
   origin: '', destination: '', current_location: '',
   weight: '', estimated_delivery: '',
   delivered_at: null, recipient: '',
@@ -200,6 +201,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       status_label:    s.status_label,
       status_icon:     s.status_icon,
       progress_step:   s.progress_step || 0,
+      item_name:       s.item_name || '',
       origin:          s.origin || '',
       destination:     s.destination || '',
       current_location:s.current_location || '',
@@ -701,10 +703,17 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                   </div>
                   <div className="form-group">
                     <label>Service Type *</label>
-                    <input type="text" placeholder="e.g. GBT Express"
+                    <input type="text" placeholder="e.g. PulsTrack Express"
                       value={form.service} required
                       onChange={e => setForm(f => ({ ...f, service: e.target.value }))} />
                   </div>
+                </div>
+                <div className="form-group">
+                  <label>Package / Item Name *</label>
+                  <input type="text" placeholder="e.g. iPhone 15 Pro, Nike Shoes, Electronics Package"
+                    value={form.item_name} required
+                    onChange={e => setForm(f => ({ ...f, item_name: e.target.value }))} />
+                  <p className="field-hint">This is shown to the customer on the tracking page.</p>
                 </div>
               </div>
 
