@@ -71,12 +71,16 @@ function getBearing(lat1, lng1, lat2, lng2) {
 // ── Journey fraction (0..1) based on real time ──────────
 function getJourneyFraction(pickupTime, deliveryTime) {
   if (!pickupTime || !deliveryTime) return null;
-  const now      = Date.now();
-  const start    = new Date(pickupTime).getTime();
-  const end      = new Date(deliveryTime).getTime();
+  const now   = Date.now();
+  const start = new Date(pickupTime).getTime();
+  const end   = new Date(deliveryTime).getTime();
+  if (isNaN(start) || isNaN(end)) return null;
   const duration = end - start;
   if (duration <= 0) return null;
-  return Math.min(1, Math.max(0, (now - start) / duration));
+  const elapsed = now - start;
+  // If journey hasn't started yet, show plane at origin
+  // If journey is past due, show plane at destination
+  return Math.min(1, Math.max(0, elapsed / duration));
 }
 
 // ── Format remaining time ────────────────────────────────
@@ -247,6 +251,18 @@ export default function TrackingMap({
 
         // ── REAL-TIME MODE ─────────────────────────────────────
         if (hasTimeWindow) {
+          // Immediately position plane on first render
+          const initialFrac = getJourneyFraction(pickupTime, deliveryTime);
+          if (initialFrac !== null && initialFrac > 0) {
+            const initialPos = interpolateArc(arc, initialFrac);
+            marker.setLatLng([initialPos.lat, initialPos.lng]);
+            trailLayer.setLatLngs(arc.slice(0, initialPos.idx + 1).map(p => [p.lat, p.lng]));
+            if (initialPos.idx > 0) {
+              const prev = arc[initialPos.idx - 1];
+              rotatePlane(getBearing(prev.lat, prev.lng, initialPos.lat, initialPos.lng));
+            }
+          }
+
           animRef.current = setInterval(() => {
             if (cancelledRef.current) {
               clearInterval(animRef.current); animRef.current = null; return;
@@ -255,15 +271,11 @@ export default function TrackingMap({
             const frac = getJourneyFraction(pickupTime, deliveryTime);
             if (frac === null) return;
 
-            // Bug fix #2: smooth interpolation between arc points
             const pos = interpolateArc(arc, frac);
             marker.setLatLng([pos.lat, pos.lng]);
-
-            // Bug fix #4: rebuild trail only if index changed
             const trail = arc.slice(0, pos.idx + 1).map(p => [p.lat, p.lng]);
             trailLayer.setLatLngs(trail);
 
-            // Rotation
             if (pos.idx > 0) {
               const prev = arc[pos.idx - 1];
               rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
@@ -272,7 +284,7 @@ export default function TrackingMap({
             if (frac >= 1) {
               clearInterval(animRef.current); animRef.current = null;
             }
-          }, 1000); // update every second
+          }, 1000);
 
         // ── LOOP ANIMATION MODE ─────────────────────────────────
         } else {
