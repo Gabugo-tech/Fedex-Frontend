@@ -180,7 +180,7 @@ export default function TrackingMap({
           color: '#c0b0e0', weight: 2.5, dashArray: '7 5', opacity: 0.7,
         }).addTo(map);
 
-        // Origin marker
+        // Origin marker — GREEN
         L.marker([originLat, originLng], {
           icon: L.divIcon({
             className: '',
@@ -189,7 +189,7 @@ export default function TrackingMap({
           }),
         }).addTo(map).bindPopup('<strong>Origin</strong>');
 
-        // Destination marker
+        // Destination marker — RED
         L.marker([destLat, destLng], {
           icon: L.divIcon({
             className: '',

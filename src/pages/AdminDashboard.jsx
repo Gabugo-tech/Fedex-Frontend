@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   origin_lat: '', origin_lng: '',
   dest_lat: '',  dest_lng: '',
   pickup_time: '', delivery_time: '',
+  _imageFile: null, _imageUrl: null,
 };
 
 const makeEmptyEvent = () => ({
@@ -161,13 +162,33 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     e.preventDefault();
     setSaving(true);
     try {
+      let shipmentId;
       if (editingShipment) {
         await updateShipment(editingShipment.id, form, token);
+        shipmentId = editingShipment.id;
         toast_show('Shipment updated');
       } else {
-        await createShipment(form, token);
+        const result = await createShipment(form, token);
+        shipmentId = result.shipment.id;
         toast_show('Shipment created');
       }
+
+      // If a new image file was selected, upload it after saving
+      if (form._imageFile && shipmentId) {
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = ev => resolve(ev.target.result.split(',')[1]);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(form._imageFile);
+          });
+          await uploadImage(shipmentId, { base64, mimeType: form._imageFile.type }, token);
+          toast_show('Image uploaded successfully');
+        } catch (imgErr) {
+          toast_show(`Shipment saved but image failed: ${imgErr.message}`, 'error');
+        }
+      }
+
       goToList();
       loadShipments();
     } catch (e) {
@@ -899,31 +920,132 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                       <div className="map-auto-label">Pickup Location</div>
                       <div className="map-auto-value">
                         {form.origin_lat
-                          ? `✓ ${parseFloat(form.origin_lat).toFixed(4)}, ${parseFloat(form.origin_lng).toFixed(4)}`
+                          ? `✓ ${form.origin} (${parseFloat(form.origin_lat).toFixed(4)}, ${parseFloat(form.origin_lng).toFixed(4)})`
                           : 'Will sync when you type Origin above'}
                       </div>
                     </div>
                   </div>
-
                   <div className="map-auto-arrow">→</div>
-
                   <div className={`map-auto-item ${form.dest_lat ? 'ready' : 'waiting'}`}>
                     <span className="map-dot dest"></span>
                     <div>
                       <div className="map-auto-label">Delivery Destination</div>
                       <div className="map-auto-value">
                         {form.dest_lat
-                          ? `✓ ${parseFloat(form.dest_lat).toFixed(4)}, ${parseFloat(form.dest_lng).toFixed(4)}`
+                          ? `✓ ${form.destination} (${parseFloat(form.dest_lat).toFixed(4)}, ${parseFloat(form.dest_lng).toFixed(4)})`
                           : 'Will sync when you type Destination above'}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {form.origin_lat && form.dest_lat && (
+                {/* Pickup & Delivery time sync status */}
+                <div className="map-auto-status" style={{ marginTop: '10px' }}>
+                  <div className={`map-auto-item ${form.pickup_time ? 'ready' : 'waiting'}`}>
+                    <span className="map-dot pkg"></span>
+                    <div>
+                      <div className="map-auto-label">Pickup Time</div>
+                      <div className="map-auto-value">
+                        {form.pickup_time
+                          ? `✓ ${new Date(form.pickup_time).toLocaleString()}`
+                          : 'Set Pickup Date & Time above'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="map-auto-arrow">→</div>
+                  <div className={`map-auto-item ${form.delivery_time ? 'ready' : 'waiting'}`}>
+                    <span className="map-dot dest"></span>
+                    <div>
+                      <div className="map-auto-label">Expected Delivery</div>
+                      <div className="map-auto-value">
+                        {form.delivery_time
+                          ? `✓ ${new Date(form.delivery_time).toLocaleString()}`
+                          : 'Set Expected Delivery above'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {form.origin_lat && form.dest_lat && form.pickup_time && form.delivery_time ? (
                   <p className="field-hint" style={{ marginTop: '12px', color: 'var(--green)' }}>
-                    <i className="fa-solid fa-check-circle"></i> Both coordinates detected — the animated map will show automatically on the tracking page.
+                    <i className="fa-solid fa-check-circle"></i> Route and timing are set — the plane will move in real time on the customer's tracking page.
                   </p>
+                ) : form.origin_lat && form.dest_lat ? (
+                  <p className="field-hint" style={{ marginTop: '12px', color: 'var(--orange)' }}>
+                    <i className="fa-solid fa-triangle-exclamation"></i> Route is set but no timing — the plane will loop continuously. Set Pickup &amp; Delivery times above for real-time movement.
+                  </p>
+                ) : (
+                  <p className="field-hint" style={{ marginTop: '12px' }}>
+                    <i className="fa-solid fa-circle-info"></i> Type the Origin and Destination above to set up the live map.
+                  </p>
+                )}
+              </div>
+
+              {/* ── SECTION 6: Package Image ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">6</span>
+                  Package Image <span className="optional">(optional)</span>
+                </div>
+                <p className="section-desc">
+                  Upload a photo of the package. Customers will see this on the tracking page.
+                </p>
+                {editingShipment ? (
+                  <div className="image-upload-area">
+                    {form._imageUrl ? (
+                      <div className="image-preview-wrap">
+                        <img src={form._imageUrl} alt="Package" className="image-preview" />
+                        <button type="button" className="btn-row-action btn-del-row"
+                          onClick={() => setForm(f => ({ ...f, _imageFile: null, _imageUrl: null }))}
+                          style={{ marginTop: '10px' }}>
+                          <i className="fa-solid fa-trash"></i> <span>Remove</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="admin-empty-small">
+                        <i className="fa-solid fa-circle-info"></i> To upload an image for this shipment, save it first then use the <strong>Manage</strong> button on the shipments list.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="image-upload-area">
+                    {form._imageUrl ? (
+                      <div className="image-preview-wrap">
+                        <img src={form._imageUrl} alt="Package preview" className="image-preview" />
+                        <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '6px' }}>
+                          <i className="fa-solid fa-check-circle"></i> Image ready — will upload after shipment is created
+                        </p>
+                        <button type="button" className="btn-row-action btn-del-row"
+                          onClick={() => setForm(f => ({ ...f, _imageFile: null, _imageUrl: null }))}
+                          style={{ marginTop: '8px' }}>
+                          <i className="fa-solid fa-trash"></i> <span>Remove</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="image-upload-label">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast_show('Image must be under 5MB', 'error');
+                              return;
+                            }
+                            const url = URL.createObjectURL(file);
+                            setForm(f => ({ ...f, _imageFile: file, _imageUrl: url }));
+                          }}
+                        />
+                        <div className="image-upload-placeholder">
+                          <i className="fa-solid fa-cloud-arrow-up"></i>
+                          <span>Click to upload package photo</span>
+                          <small>JPEG, PNG, WebP or GIF — max 5MB</small>
+                        </div>
+                      </label>
+                    )}
+                  </div>
                 )}
               </div>
 
