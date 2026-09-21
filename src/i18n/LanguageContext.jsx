@@ -3,7 +3,7 @@ import { detectLanguage, getT, LANGUAGES } from './index';
 
 const LanguageContext = createContext(null);
 
-const STORAGE_KEY = 'gbt-lang';
+const STORAGE_KEY = 'plt-lang'; // renamed from gbt-lang
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => {

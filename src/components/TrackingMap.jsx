@@ -217,7 +217,7 @@ export default function TrackingMap({
             const inner  = el.querySelector('.plane-marker-inner');
             const target = inner || el;
             target.style.transformOrigin = 'center center';
-            target.style.transform       = `rotate(${bearing - 90}deg)`;
+            target.style.transform       = `rotate(${bearing - 45}deg)`;
           }
         }
 

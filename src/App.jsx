@@ -34,6 +34,8 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const trackParam = params.get('track');
     if (trackParam) {
+      // Fix: clean URL immediately so refresh doesn't re-fire
+      window.history.replaceState({}, '', window.location.pathname);
       setHasSearched(true);
       setLoading(true);
       fetchTracking(trackParam).then(data => {

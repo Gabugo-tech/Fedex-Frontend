@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { signOut } from '../api/auth';
 import {
   getShipments, deleteShipment, updateLocation,
@@ -18,7 +19,7 @@ const STATUSES = [
 ];
 
 const EMPTY_FORM = {
-  tracking_number: '', service: 'GBT Express',
+  tracking_number: '', service: 'PulsTrack Express',
   status: 'in-transit', status_label: 'In Transit',
   status_icon: 'fa-plane', progress_step: 2,
   origin: '', destination: '', current_location: '',
@@ -90,7 +91,13 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     }, 800);
   }
 
-  useEffect(() => { loadShipments(); }, []);
+  useEffect(() => {
+    loadShipments();
+    // Fix: clean up geocode timers on unmount
+    return () => {
+      Object.values(geocodeTimers.current).forEach(id => clearTimeout(id));
+    };
+  }, []);
 
   // ── DATA ──────────────────────────────────────────────
   async function loadShipments() {
@@ -146,8 +153,15 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       }
       goToList();
       loadShipments();
-    } catch (e) { toast_show(e.message, 'error'); }
-    finally { setSaving(false); }
+    } catch (e) {
+      // Fix: handle 409 duplicate tracking number — auto-regenerate
+      if (e.message?.includes('already exists')) {
+        toast_show('Tracking number already exists — generating a new one', 'error');
+        setForm(f => ({ ...f, tracking_number: generateTrackingNumber() }));
+      } else {
+        toast_show(e.message, 'error');
+      }
+    } finally { setSaving(false); }
   }
 
   // ── DELETE ────────────────────────────────────────────
@@ -250,6 +264,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   }
 
   // ── IMAGE UPLOAD ─────────────────────────────────────
+  // Fix: properly handle async errors in FileReader callback
   async function handleImageUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -266,17 +281,18 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
 
     setImageUploading(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64 = ev.target.result.split(',')[1];
-        await uploadImage(expandedId, { base64, mimeType: file.type }, token);
-        toast_show('Image uploaded successfully');
-        loadExpanded(expandedId);
-        loadShipments();
-      };
-      reader.readAsDataURL(file);
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = ev => resolve(ev.target.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+      await uploadImage(expandedId, { base64, mimeType: file.type }, token);
+      toast_show('Image uploaded successfully');
+      loadExpanded(expandedId);
+      loadShipments();
     } catch (err) {
-      toast_show(err.message, 'error');
+      toast_show(err.message || 'Upload failed', 'error');
     } finally {
       setImageUploading(false);
     }

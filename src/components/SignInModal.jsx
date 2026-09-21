@@ -72,7 +72,7 @@ export default function SignInModal({ onSuccess, onClose }) {
           </div>
 
           {error && (
-            <div className="admin-error-banner" role="alert">
+            <div className="admin-error-banner" role="alert" aria-live="assertive">
               <i className="fa-solid fa-triangle-exclamation"></i> {error}
             </div>
           )}

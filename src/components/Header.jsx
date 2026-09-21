@@ -59,12 +59,15 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
           </div>
           <nav className="nav">
             <a href="/">Home</a>
-            <a href="#results-anchor" onClick={e => { e.preventDefault(); document.getElementById('trackingInput')?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Track</a>
+            <a href="#" onClick={e => { e.preventDefault(); document.getElementById('trackingInput')?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Track</a>
             <a href="mailto:support@pulstrack.com">{t.support}</a>
           </nav>
           {user && (
             <div className="header-actions">
-              <button className="btn-primary">Create a Shipment</button>
+              <button className="btn-primary" onClick={() => {
+                if (onGoToDashboard) onGoToDashboard();
+                else onSignInClick();
+              }}>Create a Shipment</button>
             </div>
           )}
           <button className="hamburger" onClick={() => setMenuOpen(o => !o)}
