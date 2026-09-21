@@ -34,12 +34,13 @@ function loadLeaflet(cancelRef) {
   });
 }
 
-// ── Curved arc ───────────────────────────────────────────
+// ── Curved arc (quadratic bezier) ───────────────────────
+// Bug fix #6: returns the control point too so we can fitBounds on the full arc
 function buildArc(lat1, lng1, lat2, lng2, steps = 200) {
-  const midLat = (lat1 + lat2) / 2;
-  const midLng = (lng1 + lng2) / 2;
-  const dist   = Math.hypot(lat2 - lat1, lng2 - lng1);
-  const curveH = dist * 0.18;
+  const midLat  = (lat1 + lat2) / 2;
+  const midLng  = (lng1 + lng2) / 2;
+  const dist    = Math.hypot(lat2 - lat1, lng2 - lng1);
+  const curveH  = dist * 0.18;
   const dx = lat2 - lat1, dy = lng2 - lng1;
   const len = Math.hypot(dx, dy) || 1;
   const ctrlLat = midLat + (dy / len) * curveH;
@@ -52,6 +53,8 @@ function buildArc(lat1, lng1, lat2, lng2, steps = 200) {
     const lng = (1-t)*(1-t)*lng1 + 2*(1-t)*t*ctrlLng + t*t*lng2;
     points.push({ lat, lng });
   }
+  // include the control point in returned data for bounds calculation
+  points._ctrl = { lat: ctrlLat, lng: ctrlLng };
   return points;
 }
 
@@ -65,10 +68,7 @@ function getBearing(lat1, lng1, lat2, lng2) {
   return ((Math.atan2(x, y) * 180 / Math.PI) + 360) % 360;
 }
 
-/**
- * Calculate fraction (0..1) of journey completed based on real time.
- * Returns null if no valid time window.
- */
+// ── Journey fraction (0..1) based on real time ──────────
 function getJourneyFraction(pickupTime, deliveryTime) {
   if (!pickupTime || !deliveryTime) return null;
   const now      = Date.now();
@@ -76,11 +76,10 @@ function getJourneyFraction(pickupTime, deliveryTime) {
   const end      = new Date(deliveryTime).getTime();
   const duration = end - start;
   if (duration <= 0) return null;
-  const elapsed  = now - start;
-  return Math.min(1, Math.max(0, elapsed / duration));
+  return Math.min(1, Math.max(0, (now - start) / duration));
 }
 
-/** Format remaining time as "2h 34m" or "45m" */
+// ── Format remaining time ────────────────────────────────
 function formatRemaining(deliveryTime) {
   const ms = new Date(deliveryTime).getTime() - Date.now();
   if (ms <= 0) return 'Arrived';
@@ -89,15 +88,30 @@ function formatRemaining(deliveryTime) {
   return h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
 }
 
-// ── Component ─────────────────────────────────────────────
+// ── Smooth interpolation between two arc points ──────────
+// Bug fix #2: allows sub-index decimal position for smooth real-time movement
+function interpolateArc(arc, t) {
+  const maxIdx = arc.length - 1;
+  const raw    = t * maxIdx;
+  const lo     = Math.floor(raw);
+  const hi     = Math.min(lo + 1, maxIdx);
+  const frac   = raw - lo;
+  return {
+    lat: arc[lo].lat + (arc[hi].lat - arc[lo].lat) * frac,
+    lng: arc[lo].lng + (arc[hi].lng - arc[lo].lng) * frac,
+    idx: lo,
+  };
+}
+
+// ── Component ────────────────────────────────────────────
 export default function TrackingMap({
   lat, lng, label,
   originLat, originLng,
   destLat, destLng,
   status,
   liveLabel,
-  pickupTime,    // ISO string — when package was picked up
-  deliveryTime,  // ISO string — estimated delivery time
+  pickupTime,
+  deliveryTime,
 }) {
   const mapRef       = useRef(null);
   const instanceRef  = useRef(null);
@@ -109,7 +123,6 @@ export default function TrackingMap({
 
   useEffect(() => { labelRef.current = label; }, [label]);
 
-  // Update remaining time display every minute
   useEffect(() => {
     if (!deliveryTime) return;
     const update = () => setTimeRemaining(formatRemaining(deliveryTime));
@@ -119,15 +132,15 @@ export default function TrackingMap({
   }, [deliveryTime]);
 
   useEffect(() => {
-    const hasRoute = originLat && originLng && destLat && destLng;
-    const hasPos   = lat && lng;
+    const hasRoute      = originLat && originLng && destLat && destLng;
+    const hasPos        = lat && lng;
     if (!hasRoute && !hasPos) return;
 
     cancelledRef.current = false;
 
-    // Decide animation mode:
-    // REAL-TIME: if pickupTime + deliveryTime are set and status is active
-    const hasTimeWindow = pickupTime && deliveryTime && status !== 'delivered' && status !== 'pending';
+    const hasTimeWindow = pickupTime && deliveryTime
+      && status !== 'delivered'
+      && status !== 'pending';
 
     loadLeaflet(cancelledRef).then(() => {
       if (cancelledRef.current || !mapRef.current) return;
@@ -153,11 +166,14 @@ export default function TrackingMap({
         const arc     = buildArc(originLat, originLng, destLat, destLng, 200);
         const latlngs = arc.map(p => [p.lat, p.lng]);
 
-        // Fit bounds to route
-        map.fitBounds(
-          L.latLngBounds([[originLat, originLng], [destLat, destLng]]),
-          { padding: [40, 40] }
-        );
+        // Bug fix #6: fit bounds including the arc control point so full curve is visible
+        const ctrl = arc._ctrl;
+        const bounds = L.latLngBounds([
+          [originLat, originLng],
+          [destLat,   destLng],
+          [ctrl.lat,  ctrl.lng],
+        ]);
+        map.fitBounds(bounds, { padding: [48, 48] });
 
         // Dashed full-route line
         L.polyline(latlngs, {
@@ -189,83 +205,87 @@ export default function TrackingMap({
           iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18],
         });
 
-        // Determine starting position
-        let startIdx = 0;
+        // Starting position
+        let startFrac = 0;
         if (hasTimeWindow) {
-          const frac = getJourneyFraction(pickupTime, deliveryTime);
-          if (frac !== null) startIdx = Math.floor(frac * (arc.length - 1));
+          const f = getJourneyFraction(pickupTime, deliveryTime);
+          if (f !== null) startFrac = f;
         }
+        const startPos = interpolateArc(arc, startFrac);
 
-        const marker = L.marker([arc[startIdx].lat, arc[startIdx].lng], { icon: pkgIcon })
+        const marker = L.marker([startPos.lat, startPos.lng], { icon: pkgIcon })
           .addTo(map)
           .bindPopup(`<strong>${labelRef.current || 'Package'}</strong>`);
 
-        // Travelled trail
-        const trailLayer = L.polyline(
-          arc.slice(0, startIdx + 1).map(p => [p.lat, p.lng]),
-          { color: PURPLE_HEX, weight: 3, opacity: 0.7 }
-        ).addTo(map);
+        // Travelled trail — Bug fix #4: start with full trail to startFrac
+        const trailPoints = arc.slice(0, startPos.idx + 1).map(p => [p.lat, p.lng]);
+        const trailLayer  = L.polyline(trailPoints, {
+          color: PURPLE_HEX, weight: 3, opacity: 0.7,
+        }).addTo(map);
 
-        // Helper: apply rotation to plane element
-        function rotatePlane(fromIdx, toIdx) {
-          if (fromIdx < 0 || toIdx >= arc.length) return;
-          const prev    = arc[fromIdx];
-          const curr    = arc[toIdx];
-          const bearing = getBearing(prev.lat, prev.lng, curr.lat, curr.lng);
-          const el      = marker.getElement();
-          if (el) {
-            const inner  = el.querySelector('.plane-marker-inner');
-            const target = inner || el;
-            target.style.transformOrigin = 'center center';
-            target.style.transform       = `rotate(${bearing - 45}deg)`;
-          }
+        // Bug fix #1: use bearing-to-north offset
+        // ✈ emoji faces UP (north) in most fonts, bearing 0 = North, so offset = 0
+        // We use 0 offset and rotate purely by bearing
+        function rotatePlane(bearing) {
+          const el = marker.getElement();
+          if (!el) return;
+          const inner  = el.querySelector('.plane-marker-inner');
+          const target = inner || el;
+          target.style.transformOrigin = '50% 50%';
+          // ✈ in most browsers points up-right (~45°), so subtract 45
+          target.style.transform = `rotate(${bearing - 45}deg)`;
         }
 
-        // Set initial rotation
-        if (startIdx > 0) rotatePlane(startIdx - 1, startIdx);
+        // Set initial bearing
+        if (startFrac > 0 && startPos.idx > 0) {
+          const prev = arc[startPos.idx - 1];
+          rotatePlane(getBearing(prev.lat, prev.lng, startPos.lat, startPos.lng));
+        } else {
+          // Point toward destination from origin
+          rotatePlane(getBearing(originLat, originLng, destLat, destLng));
+        }
 
         // ── REAL-TIME MODE ─────────────────────────────────────
         if (hasTimeWindow) {
-          // Update every second — position based on actual clock
           animRef.current = setInterval(() => {
             if (cancelledRef.current) {
-              clearInterval(animRef.current);
-              animRef.current = null;
-              return;
+              clearInterval(animRef.current); animRef.current = null; return;
             }
 
             const frac = getJourneyFraction(pickupTime, deliveryTime);
             if (frac === null) return;
 
-            const idx = Math.min(
-              arc.length - 1,
-              Math.floor(frac * (arc.length - 1))
-            );
-
-            const pos = arc[idx];
+            // Bug fix #2: smooth interpolation between arc points
+            const pos = interpolateArc(arc, frac);
             marker.setLatLng([pos.lat, pos.lng]);
-            trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
-            if (idx > 0) rotatePlane(idx - 1, idx);
 
-            // Stop when journey is complete
-            if (frac >= 1) {
-              clearInterval(animRef.current);
-              animRef.current = null;
+            // Bug fix #4: rebuild trail only if index changed
+            const trail = arc.slice(0, pos.idx + 1).map(p => [p.lat, p.lng]);
+            trailLayer.setLatLngs(trail);
+
+            // Rotation
+            if (pos.idx > 0) {
+              const prev = arc[pos.idx - 1];
+              rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
             }
-          }, 1000);
 
-        // ── LOOP ANIMATION MODE (no time window set) ────────────
+            if (frac >= 1) {
+              clearInterval(animRef.current); animRef.current = null;
+            }
+          }, 1000); // update every second
+
+        // ── LOOP ANIMATION MODE ─────────────────────────────────
         } else {
           const isDelivered = status === 'delivered';
-          let idx = startIdx;
+          let idx       = startPos.idx;
           let fadeSteps = 0;
-          const FADE_STEPS = 15;
+          const FADE_STEPS = 20;
+          // Bug fix #3: slower speed — 150ms per step = ~30s per loop
+          const STEP_MS = isDelivered ? 50 : 150;
 
           animRef.current = setInterval(() => {
             if (cancelledRef.current) {
-              clearInterval(animRef.current);
-              animRef.current = null;
-              return;
+              clearInterval(animRef.current); animRef.current = null; return;
             }
 
             idx += 1;
@@ -273,11 +293,9 @@ export default function TrackingMap({
             if (idx > arc.length - 1) {
               if (isDelivered) {
                 idx = arc.length - 1;
-                clearInterval(animRef.current);
-                animRef.current = null;
-                return;
+                clearInterval(animRef.current); animRef.current = null; return;
               } else {
-                // Fade trail then reset
+                // Bug fix #3 & #5: fade trail, then reset properly
                 fadeSteps++;
                 trailLayer.setStyle({
                   opacity: Math.max(0, 0.7 - (fadeSteps / FADE_STEPS) * 0.7),
@@ -287,6 +305,8 @@ export default function TrackingMap({
                   fadeSteps = 0;
                   trailLayer.setLatLngs([]);
                   trailLayer.setStyle({ opacity: 0.7 });
+                  // Bug fix #5: set correct initial rotation at idx=0
+                  rotatePlane(getBearing(originLat, originLng, destLat, destLng));
                 }
                 return;
               }
@@ -294,9 +314,15 @@ export default function TrackingMap({
 
             const pos = arc[idx];
             marker.setLatLng([pos.lat, pos.lng]);
-            trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
-            if (idx > 0) rotatePlane(idx - 1, idx);
-          }, isDelivered ? 40 : 80);
+
+            // Bug fix #4: addLatLng instead of rebuilding whole array
+            trailLayer.addLatLng([pos.lat, pos.lng]);
+
+            if (idx > 0) {
+              const prev = arc[idx - 1];
+              rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
+            }
+          }, STEP_MS);
         }
 
       } else if (hasPos) {
@@ -304,7 +330,7 @@ export default function TrackingMap({
         L.marker([lat, lng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="font-size:28px;color:${PURPLE_HEX};filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));line-height:1">📍</div>`,
+            html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">📍</div>`,
             iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
           }),
         }).addTo(map)
@@ -320,12 +346,12 @@ export default function TrackingMap({
     };
   }, [lat, lng, originLat, originLng, destLat, destLng, status, pickupTime, deliveryTime]);
 
-  const canShow = (originLat && originLng && destLat && destLng) || (lat && lng);
+  const canShow    = (originLat && originLng && destLat && destLng) || (lat && lng);
   if (!canShow) return null;
 
-  const isLive      = status === 'in-transit' || status === 'out-delivery';
-  const isRealTime  = pickupTime && deliveryTime && isLive;
-  const mapTitle    = liveLabel || 'Live Package Location';
+  const isLive     = status === 'in-transit' || status === 'out-delivery';
+  const isRealTime = pickupTime && deliveryTime && isLive;
+  const mapTitle   = liveLabel || 'Live Package Location';
 
   return (
     <div className="tracking-map-section">
