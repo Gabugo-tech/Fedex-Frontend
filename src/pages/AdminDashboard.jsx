@@ -880,7 +880,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                   </p>
                 )}
               </div>
-              </div>
 
               {/* ── FORM ACTIONS ── */}
               <div className="form-actions form-actions-sticky">
