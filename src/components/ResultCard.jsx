@@ -1,6 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TrackingMap from './TrackingMap';
 import { useLang } from '../i18n/LanguageContext';
+
+// ── Lightbox image component ──────────────────────────────
+function ItemImage({ url }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="item-image-section">
+        <h4>
+          <i className="fa-solid fa-image"></i> Item Photo
+          <span className="item-image-tap-hint">tap to expand</span>
+        </h4>
+        <img
+          src={url}
+          alt="Shipment item"
+          className="item-image item-image-clickable"
+          onClick={() => setOpen(true)}
+        />
+      </div>
+      {open && (
+        <div className="lightbox-overlay" onClick={() => setOpen(false)}>
+          <button className="lightbox-close" onClick={() => setOpen(false)} aria-label="Close">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+          <img
+            src={url}
+            alt="Shipment item full size"
+            className="lightbox-image"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Reverse geocode lat/lng to a city name ────────────────
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await res.json();
+    const a = data.address || {};
+    // Build a clean location string: City, Country
+    const city = a.city || a.town || a.village || a.county || a.state || '';
+    const country = a.country || '';
+    return city ? `${city}, ${country}` : country || data.display_name?.split(',')[0] || '';
+  } catch {
+    return null;
+  }
+}
+
+// ── Journey fraction helper (same as TrackingMap) ─────────
+function getJourneyFraction(pickupTime, deliveryTime) {
+  if (!pickupTime || !deliveryTime) return null;
+  const now = Date.now();
+  const start = new Date(pickupTime).getTime();
+  const end   = new Date(deliveryTime).getTime();
+  if (isNaN(start) || isNaN(end) || end - start <= 0) return null;
+  return Math.min(1, Math.max(0, (now - start) / (end - start)));
+}
+
+// ── Bezier arc (matches TrackingMap exactly) ──────────────
+function interpolatePosition(originLat, originLng, destLat, destLng, frac) {
+  const midLat  = (originLat + destLat) / 2;
+  const midLng  = (originLng + destLng) / 2;
+  const dist    = Math.hypot(destLat - originLat, destLng - originLng);
+  const curveH  = dist * 0.18;
+  const dx = destLat - originLat, dy = destLng - originLng;
+  const len = Math.hypot(dx, dy) || 1;
+  const ctrlLat = midLat + (dy / len) * curveH;
+  const ctrlLng = midLng - (dx / len) * curveH;
+  const t = frac;
+  return {
+    lat: (1-t)*(1-t)*originLat + 2*(1-t)*t*ctrlLat + t*t*destLat,
+    lng: (1-t)*(1-t)*originLng + 2*(1-t)*t*ctrlLng + t*t*destLng,
+  };
+}
 
 const STATUS_CLASS = {
   delivered:      'delivered',
@@ -20,12 +99,60 @@ const STATUS_ICON = {
 
 export default function ResultCard({ result, steps }) {
   const { t } = useLang();
-  const [copied, setCopied]       = useState(false);
+  const [copied, setCopied]         = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [liveLocation, setLiveLocation] = useState(result.current_location);
+  const geocodeTimerRef = useRef(null);
+  const lastGeocodedRef = useRef({ lat: null, lng: null });
+
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
   const hasMap = (result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng)
               || (result.map_lat && result.map_lng);
+
+  const isMoving = (result.status === 'in-transit' || result.status === 'out-delivery')
+    && result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng;
+
+  // ── Real-time location update ──────────────────────────
+  // Every 30 seconds, calculate plane's current position and reverse geocode it
+  useEffect(() => {
+    if (!isMoving) return;
+
+    async function updateLocation() {
+      let lat, lng;
+
+      if (result.pickup_time && result.delivery_time) {
+        const frac = getJourneyFraction(result.pickup_time, result.delivery_time);
+        if (frac === null) return;
+        const pos = interpolatePosition(
+          parseFloat(result.origin_lat), parseFloat(result.origin_lng),
+          parseFloat(result.dest_lat),   parseFloat(result.dest_lng),
+          frac
+        );
+        lat = pos.lat;
+        lng = pos.lng;
+      } else {
+        // No time window — use midpoint as approximation
+        lat = (parseFloat(result.origin_lat) + parseFloat(result.dest_lat)) / 2;
+        lng = (parseFloat(result.origin_lng) + parseFloat(result.dest_lng)) / 2;
+      }
+
+      // Only reverse geocode if position changed significantly (>0.5 degree)
+      const prev = lastGeocodedRef.current;
+      const moved = !prev.lat || Math.hypot(lat - prev.lat, lng - prev.lng) > 0.5;
+      if (!moved) return;
+
+      lastGeocodedRef.current = { lat, lng };
+      const name = await reverseGeocode(lat, lng);
+      if (name) setLiveLocation(name);
+    }
+
+    // Run immediately then every 30s
+    updateLocation();
+    const id = setInterval(updateLocation, 30000);
+    return () => clearInterval(id);
+  }, [isMoving, result.pickup_time, result.delivery_time,
+      result.origin_lat, result.origin_lng, result.dest_lat, result.dest_lng]);
 
   function copyTracking() {
     navigator.clipboard.writeText(result.tracking_number).then(() => {
@@ -87,8 +214,15 @@ export default function ResultCard({ result, steps }) {
         <div className="info-block">
           <div className="info-block-icon"><i className="fa-solid fa-location-dot"></i></div>
           <div>
-            <div className="info-block-label">{t.currentLocation}</div>
-            <div className="info-block-value">{result.current_location}</div>
+            <div className="info-block-label">
+              {t.currentLocation}
+              {isMoving && (
+                <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--orange)', fontWeight: 700 }}>
+                  <i className="fa-solid fa-circle" style={{ fontSize: '7px', animation: 'pulse 1.2s infinite' }}></i> LIVE
+                </span>
+              )}
+            </div>
+            <div className="info-block-value">{liveLocation}</div>
           </div>
         </div>
         <div className="info-block">
@@ -135,14 +269,7 @@ export default function ResultCard({ result, steps }) {
 
       {/* ── ITEM IMAGE ── */}
       {result.item_image_url && (
-        <div className="item-image-section">
-          <h4><i className="fa-solid fa-image"></i> Item Photo</h4>
-          <img
-            src={result.item_image_url}
-            alt="Shipment item"
-            className="item-image"
-          />
-        </div>
+        <ItemImage url={result.item_image_url} />
       )}
 
       {/* ── LIVE MAP ── */}
@@ -150,7 +277,7 @@ export default function ResultCard({ result, steps }) {
         <TrackingMap
           lat={result.map_lat ? parseFloat(result.map_lat) : null}
           lng={result.map_lng ? parseFloat(result.map_lng) : null}
-          label={result.current_location}
+          label={liveLocation}
           originLat={result.origin_lat ? parseFloat(result.origin_lat) : null}
           originLng={result.origin_lng ? parseFloat(result.origin_lng) : null}
           destLat={result.dest_lat ? parseFloat(result.dest_lat) : null}
@@ -171,9 +298,7 @@ export default function ResultCard({ result, steps }) {
             const cls = i < result.progress_step ? 'done' : i === result.progress_step ? 'current' : '';
             return (
               <div key={step.label} className={`step ${cls}`}>
-                <div className="step-dot">
-                  <i className={`fa-solid ${step.icon}`}></i>
-                </div>
+                <div className="step-dot"><i className={`fa-solid ${step.icon}`}></i></div>
                 <div className="step-label">{step.label}</div>
               </div>
             );
