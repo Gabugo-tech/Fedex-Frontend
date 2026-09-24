@@ -5,15 +5,25 @@ export default function Hero({ onTrack, loading, error }) {
   const { t } = useLang();
   const [input, setInput]           = useState('');
   const [inputError, setInputError] = useState(false);
-  const didTrackRef = useRef(false);
+  const didTrackRef    = useRef(false);
+  const hadErrorRef    = useRef(false);
 
   useEffect(() => {
+    // Fix #34: only scroll if there was no error (results actually appeared)
     if (!loading && didTrackRef.current) {
       didTrackRef.current = false;
-      const el = document.getElementById('results-anchor');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!hadErrorRef.current) {
+        const el = document.getElementById('results-anchor');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      hadErrorRef.current = false;
     }
   }, [loading]);
+
+  // Sync error ref so the scroll effect can check it
+  useEffect(() => {
+    if (error) hadErrorRef.current = true;
+  }, [error]);
 
   function handleTrack() {
     if (!input.trim()) {
@@ -21,9 +31,11 @@ export default function Hero({ onTrack, loading, error }) {
       setTimeout(() => setInputError(false), 1500);
       return;
     }
-    didTrackRef.current = true;
+    didTrackRef.current  = true;
+    hadErrorRef.current  = false;
     onTrack(input);
-    setInput('');
+    // Fix #32: only clear input when there is no current error — clear after submit
+    // We don't clear here; clear happens in App after successful result
   }
 
   function handleKey(e) {
@@ -42,6 +54,7 @@ export default function Hero({ onTrack, loading, error }) {
           </div>
 
           <div className="tracking-body">
+            {/* Fix #41: remove duplicate aria-label — label is sufficient */}
             <label htmlFor="trackingInput">{t.trackLabel}</label>
             <div className="tracking-input-row">
               <input
@@ -53,7 +66,6 @@ export default function Hero({ onTrack, loading, error }) {
                 onKeyDown={handleKey}
                 className={inputError ? 'error' : ''}
                 maxLength={200}
-                aria-label={t.trackLabel}
               />
               <button
                 className="btn-track"
@@ -68,8 +80,15 @@ export default function Hero({ onTrack, loading, error }) {
               </button>
             </div>
 
+            {/* Fix #33: add aria-live so screen readers announce errors */}
+            {inputError && (
+              <p role="alert" aria-live="assertive" className="error-hint">
+                {t.trackPlaceholder}
+              </p>
+            )}
+
             {error && (
-              <div className="error-banner" role="alert">
+              <div className="error-banner" role="alert" aria-live="assertive">
                 <i className="fa-solid fa-triangle-exclamation"></i> {error}
               </div>
             )}

@@ -78,9 +78,10 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
 
         {/* Mobile Nav */}
         <div className={`mobile-nav ${menuOpen ? 'open' : ''}`}>
-          <a href="/">Home</a>
+          {/* Fix #40: close nav on link click */}
+          <a href="/" onClick={() => setMenuOpen(false)}>Home</a>
           <a href="#" onClick={e => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); document.getElementById('trackingInput')?.focus(); }}>Track</a>
-          <a href="mailto:support@pulstrack.com">{t.support}</a>
+          <a href="mailto:support@pulstrack.com" onClick={() => setMenuOpen(false)}>{t.support}</a>
           {/* Mobile language switcher */}
           <div className="lang-switcher mobile">
             {Object.entries(LANGUAGES).map(([code, info]) => (
@@ -88,8 +89,10 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
                 key={code}
                 className={`lang-btn ${lang === code ? 'active' : ''}`}
                 onClick={() => { switchLang(code); setMenuOpen(false); }}
+                aria-label={`Switch to ${info.label}`}
               >
-                {info.flag} {info.label}
+                {/* Fix #45: hide flag emoji from screen readers */}
+                <span aria-hidden="true">{info.flag}</span> {info.label}
               </button>
             ))}
           </div>

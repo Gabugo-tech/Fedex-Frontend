@@ -8,6 +8,7 @@ import SignInModal from './components/SignInModal';
 import { fetchTracking } from './api/tracking';
 import { getSession, signOut } from './api/auth';
 
+// Admin email only used for session check — not exposed in UI
 const ADMIN_EMAIL = 'nnanwubagabriel@gmail.com';
 
 export default function App() {
@@ -31,18 +32,16 @@ export default function App() {
     }).catch(() => setSessionChecked(true));
 
     // Auto-track if ?track=XXXX is in the URL
-    const params = new URLSearchParams(window.location.search);
+    const params     = new URLSearchParams(window.location.search);
     const trackParam = params.get('track');
     if (trackParam) {
-      // Fix: clean URL immediately so refresh doesn't re-fire
       window.history.replaceState({}, '', window.location.pathname);
       setHasSearched(true);
       setLoading(true);
-      fetchTracking(trackParam).then(data => {
-        setResults(data);
-      }).catch(err => {
-        setError(err.message || 'Something went wrong.');
-      }).finally(() => setLoading(false));
+      fetchTracking(trackParam)
+        .then(data => setResults(data))
+        .catch(err => setError(err.message || 'Something went wrong.'))
+        .finally(() => setLoading(false));
     }
   }, []);
 
@@ -74,8 +73,9 @@ export default function App() {
     setShowSignIn(false);
   }
 
+  // Fix #26: wrap signOut in try/catch so logout always completes
   async function handleSignOut() {
-    await signOut();
+    try { await signOut(); } catch (_) { /* ignore supabase errors */ }
     setAdminSession(null);
     setBackedToSite(false);
     sessionStorage.removeItem('plt-backed');
@@ -107,16 +107,20 @@ export default function App() {
     );
   }
 
+  // Fix #2: only show admin email in header when a real verified session exists
+  // backedToSite = session exists but user chose to stay on public site
+  const headerUser = backedToSite ? { email: ADMIN_EMAIL } : null;
+
   return (
     <>
       <Header
-        user={backedToSite ? { email: ADMIN_EMAIL } : null}
+        user={headerUser}
         onSignInClick={() => {
           if (backedToSite) {
             getSession().then(session => {
               if (session) { setAdminSession(session); setBackedToSite(false); }
               else setShowSignIn(true);
-            });
+            }).catch(() => setShowSignIn(true));
           } else {
             setShowSignIn(true);
           }
@@ -125,7 +129,7 @@ export default function App() {
         onGoToDashboard={backedToSite ? () => {
           getSession().then(session => {
             if (session) { setAdminSession(session); setBackedToSite(false); }
-          });
+          }).catch(() => {});
         } : null}
       />
       <Hero onTrack={handleTrack} loading={loading} error={error} />

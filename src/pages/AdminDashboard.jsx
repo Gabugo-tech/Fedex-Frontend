@@ -76,7 +76,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       try {
         const res  = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (pulstrack-app)' } }
         );
         const data = await res.json();
         if (data.length === 0) {
@@ -139,10 +139,10 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     } catch (e) { toast_show(e.message, 'error'); }
   }
 
-  // ── TOAST ─────────────────────────────────────────────
+  // Fix #35: error toasts persist longer (8s), success toasts dismiss at 3.5s
   function toast_show(msg, type = 'success') {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), type === 'error' ? 8000 : 3500);
   }
 
   // ── STATUS CHANGE — auto-sets progress step ───────────
@@ -163,12 +163,14 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     setSaving(true);
     try {
       let shipmentId;
+      // Fix #28: strip client-only temp fields before sending to backend
+      const { _imageFile, _imageUrl, ...formData } = form;
       if (editingShipment) {
-        await updateShipment(editingShipment.id, form, token);
+        await updateShipment(editingShipment.id, formData, token);
         shipmentId = editingShipment.id;
         toast_show('Shipment updated');
       } else {
-        const result = await createShipment(form, token);
+        const result = await createShipment(formData, token);
         shipmentId = result.shipment.id;
         toast_show('Shipment created');
       }
@@ -393,7 +395,11 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
           <button className="btn-sidebar-action" onClick={onBackToSite}>
             <i className="fa-solid fa-arrow-left"></i> Back to site
           </button>
-          <button className="btn-logout" onClick={async () => { await signOut(); onLogout(); }}>
+          {/* Fix #25: signOut try/catch so onLogout always fires */}
+          <button className="btn-logout" onClick={async () => {
+            try { await signOut(); } catch (_) {}
+            onLogout();
+          }}>
             <i className="fa-solid fa-right-from-bracket"></i> Sign Out
           </button>
         </div>
@@ -784,11 +790,15 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                         setGeoStatus(s => ({ ...s, origin: '' }));
                         scheduleGeocode('origin', e.target.value);
                       }} />
-                    {/* Dropdown results */}
+                    {/* Fix #36: keyboard navigation on geo-dropdown */}
                     {geoResults.origin.length > 0 && (
-                      <ul className="geo-dropdown">
-                        {geoResults.origin.map(r => (
-                          <li key={r.place_id} onClick={() => handleGeoSelect('origin', r)}>
+                      <ul className="geo-dropdown" role="listbox" aria-label="Location suggestions">
+                        {geoResults.origin.map((r, i) => (
+                          <li key={r.place_id}
+                            role="option"
+                            tabIndex={0}
+                            onClick={() => handleGeoSelect('origin', r)}
+                            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleGeoSelect('origin', r)}>
                             <i className="fa-solid fa-location-dot"></i>
                             <span>{r.display_name}</span>
                           </li>
@@ -822,11 +832,15 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                         setGeoStatus(s => ({ ...s, dest: '' }));
                         scheduleGeocode('dest', e.target.value);
                       }} />
-                    {/* Dropdown results */}
+                    {/* Fix #36: keyboard navigation on dest geo-dropdown */}
                     {geoResults.dest.length > 0 && (
-                      <ul className="geo-dropdown">
+                      <ul className="geo-dropdown" role="listbox" aria-label="Location suggestions">
                         {geoResults.dest.map(r => (
-                          <li key={r.place_id} onClick={() => handleGeoSelect('dest', r)}>
+                          <li key={r.place_id}
+                            role="option"
+                            tabIndex={0}
+                            onClick={() => handleGeoSelect('dest', r)}
+                            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleGeoSelect('dest', r)}>
                             <i className="fa-solid fa-location-dot"></i>
                             <span>{r.display_name}</span>
                           </li>
@@ -1034,6 +1048,8 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                               toast_show('Image must be under 5MB', 'error');
                               return;
                             }
+                            // Fix #7: revoke previous object URL to prevent memory leak
+                            if (form._imageUrl) URL.revokeObjectURL(form._imageUrl);
                             const url = URL.createObjectURL(file);
                             setForm(f => ({ ...f, _imageFile: file, _imageUrl: url }));
                           }}

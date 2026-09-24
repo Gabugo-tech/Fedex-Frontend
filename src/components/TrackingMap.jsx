@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
@@ -249,7 +250,13 @@ export default function TrackingMap({
           rotatePlane(getBearing(originLat, originLng, destLat, destLng));
         }
 
-        // ── ANIMATION ──────────────────────────────────────────
+        // Fix #20: pause animation when tab is hidden to save CPU
+        const handleVisibility = () => {
+          if (document.hidden) {
+            if (animRef.current) { clearInterval(animRef.current); animRef.current = null; }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
         // Always animate smoothly (loop). If real-time window is set,
         // snap to the correct real-time position every second as well.
         const isDelivered = status === 'delivered';
@@ -335,6 +342,7 @@ export default function TrackingMap({
 
     return () => {
       cancelledRef.current = true;
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
       if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
     };
@@ -375,9 +383,12 @@ export default function TrackingMap({
             <p>Loading map…</p>
           </div>
         )}
+        {/* Fix #44: add role and aria-label for accessibility */}
         <div
           ref={mapRef}
           className="tracking-map"
+          role="img"
+          aria-label={`Package route map from ${label || 'origin'} to destination`}
           style={{ visibility: mapLoading ? 'hidden' : 'visible' }}
         ></div>
       </div>

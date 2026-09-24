@@ -36,17 +36,16 @@ function ItemImage({ url }) {
   );
 }
 
-// ── Reverse geocode lat/lng to a city name ────────────────
+// Fix #22: add Nominatim-required User-Agent header
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (pulstrack-app)' } }
     );
     const data = await res.json();
     const a = data.address || {};
-    // Build a clean location string: City, Country
-    const city = a.city || a.town || a.village || a.county || a.state || '';
+    const city    = a.city || a.town || a.village || a.county || a.state || '';
     const country = a.country || '';
     return city ? `${city}, ${country}` : country || data.display_name?.split(',')[0] || '';
   } catch {
@@ -54,32 +53,7 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-// ── Journey fraction helper (same as TrackingMap) ─────────
-function getJourneyFraction(pickupTime, deliveryTime) {
-  if (!pickupTime || !deliveryTime) return null;
-  const now = Date.now();
-  const start = new Date(pickupTime).getTime();
-  const end   = new Date(deliveryTime).getTime();
-  if (isNaN(start) || isNaN(end) || end - start <= 0) return null;
-  return Math.min(1, Math.max(0, (now - start) / (end - start)));
-}
-
-// ── Bezier arc (matches TrackingMap exactly) ──────────────
-function interpolatePosition(originLat, originLng, destLat, destLng, frac) {
-  const midLat  = (originLat + destLat) / 2;
-  const midLng  = (originLng + destLng) / 2;
-  const dist    = Math.hypot(destLat - originLat, destLng - originLng);
-  const curveH  = dist * 0.18;
-  const dx = destLat - originLat, dy = destLng - originLng;
-  const len = Math.hypot(dx, dy) || 1;
-  const ctrlLat = midLat + (dy / len) * curveH;
-  const ctrlLng = midLng - (dx / len) * curveH;
-  const t = frac;
-  return {
-    lat: (1-t)*(1-t)*originLat + 2*(1-t)*t*ctrlLat + t*t*destLat,
-    lng: (1-t)*(1-t)*originLng + 2*(1-t)*t*ctrlLng + t*t*destLng,
-  };
-}
+import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
 
 const STATUS_CLASS = {
   delivered:      'delivered',
@@ -154,19 +128,18 @@ export default function ResultCard({ result, steps }) {
   }, [isMoving, result.pickup_time, result.delivery_time,
       result.origin_lat, result.origin_lng, result.dest_lat, result.dest_lng]);
 
+// Fix #12: add .catch to clipboard writes
   function copyTracking() {
-    navigator.clipboard.writeText(result.tracking_number).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(result.tracking_number)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => { /* clipboard not available */ });
   }
 
   function shareLink() {
     const url = `${window.location.origin}/?track=${encodeURIComponent(result.tracking_number)}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2500);
-    });
+    navigator.clipboard.writeText(url)
+      .then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); })
+      .catch(() => { /* clipboard not available */ });
   }
 
   return (
@@ -314,7 +287,8 @@ export default function ResultCard({ result, steps }) {
             <p style={{ color: 'var(--gray-400)', fontSize: '13px' }}>{t.noEvents}</p>
           ) : (
             result.timeline.map((evt, i) => (
-              <div key={`${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
+              // Fix #16: use evt.id as stable key (now returned by backend)
+              <div key={evt.id || `${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
                 <div className="timeline-dot"></div>
                 <div className="timeline-date">{evt.date}</div>
                 <div className="timeline-status">{evt.status}</div>
