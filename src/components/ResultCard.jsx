@@ -41,7 +41,7 @@ async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (pulstrack-app)' } }
+      { headers: { 'Accept-Language': 'en' } }
     );
     const data = await res.json();
     const a = data.address || {};

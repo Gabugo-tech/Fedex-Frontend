@@ -74,10 +74,11 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       setGeoStatus(s => ({ ...s, [field]: 'loading' }));
       setGeoResults(r => ({ ...r, [field]: [] }));
       try {
-        const res  = await fetch(
+        const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (pulstrack-app)' } }
+          { headers: { 'Accept-Language': 'en' } }
         );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.length === 0) {
           setGeoStatus(s => ({ ...s, [field]: 'notfound' }));
@@ -85,7 +86,8 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
           setGeoResults(r => ({ ...r, [field]: data }));
           setGeoStatus(s => ({ ...s, [field]: 'choose' }));
         }
-      } catch {
+      } catch (err) {
+        console.warn('Geocode failed:', err.message);
         setGeoStatus(s => ({ ...s, [field]: 'error' }));
       }
     }, 700);
