@@ -69,21 +69,6 @@ function getBearing(lat1, lng1, lat2, lng2) {
   return ((Math.atan2(x, y) * 180 / Math.PI) + 360) % 360;
 }
 
-// ── Journey fraction (0..1) based on real time ──────────
-function getJourneyFraction(pickupTime, deliveryTime) {
-  if (!pickupTime || !deliveryTime) return null;
-  const now   = Date.now();
-  const start = new Date(pickupTime).getTime();
-  const end   = new Date(deliveryTime).getTime();
-  if (isNaN(start) || isNaN(end)) return null;
-  const duration = end - start;
-  if (duration <= 0) return null;
-  const elapsed = now - start;
-  // If journey hasn't started yet, show plane at origin
-  // If journey is past due, show plane at destination
-  return Math.min(1, Math.max(0, elapsed / duration));
-}
-
 // ── Format remaining time ────────────────────────────────
 function formatRemaining(deliveryTime) {
   const ms = new Date(deliveryTime).getTime() - Date.now();
