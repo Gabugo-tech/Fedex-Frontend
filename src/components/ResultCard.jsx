@@ -61,10 +61,8 @@ export default function ResultCard({ result, steps }) {
 
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
-  const hasMap = (result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng)
-              || (result.map_lat && result.map_lng);
-  const isMoving = (result.status === 'in-transit' || result.status === 'out-delivery')
-    && result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng;
+  const hasMap = !!(result.map_lat && result.map_lng);
+  const isMoving = false; // map shows static pin only
 
   // Parse service_tags from comma-separated string
   const serviceTags = result.service_tags
@@ -218,14 +216,7 @@ export default function ResultCard({ result, steps }) {
           lat={result.map_lat ? parseFloat(result.map_lat) : null}
           lng={result.map_lng ? parseFloat(result.map_lng) : null}
           label={liveLocation}
-          originLat={result.origin_lat ? parseFloat(result.origin_lat) : null}
-          originLng={result.origin_lng ? parseFloat(result.origin_lng) : null}
-          destLat={result.dest_lat ? parseFloat(result.dest_lat) : null}
-          destLng={result.dest_lng ? parseFloat(result.dest_lng) : null}
           status={result.status}
-          liveLabel={t.liveLocation}
-          pickupTime={result.pickup_time || null}
-          deliveryTime={result.delivery_time || null}
         />
       )}
 

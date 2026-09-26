@@ -8,6 +8,159 @@ import {
 import AdminMapPicker from '../components/AdminMapPicker';
 import { generateTrackingNumber } from '../utils/generateTrackingNumber';
 
+// ── CurrentLocationPicker ─────────────────────────────────────────────────────
+// Inline search + mini map for setting the package's current location pin
+function CurrentLocationPicker({ value, lat, lng, onChange }) {
+  const mapRef     = useRef(null);
+  const instanceRef = useRef(null);
+  const markerRef  = useRef(null);
+  const mountedRef = useRef(true);
+  const [query, setQuery]       = useState(value || '');
+  const [results, setResults]   = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState('');
+
+  useEffect(() => {
+    mountedRef.current = true;
+    // Init map
+    const loadL = () => new Promise((resolve, reject) => {
+      if (window.L) return resolve();
+      const existing = document.getElementById('leaflet-js');
+      if (existing) {
+        const wait = setInterval(() => { if (window.L) { clearInterval(wait); resolve(); } }, 50);
+        return;
+      }
+      const s = Object.assign(document.createElement('script'), {
+        id: 'leaflet-js', src: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+      });
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+
+    loadL().then(() => {
+      if (!mountedRef.current || !mapRef.current || instanceRef.current) return;
+      const L = window.L;
+      const initLat = lat ? parseFloat(lat) : 20;
+      const initLng = lng ? parseFloat(lng) : 0;
+      const zoom    = lat ? 12 : 2;
+      const map = L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: false })
+        .setView([initLat, initLng], zoom);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19,
+      }).addTo(map);
+
+      if (lat && lng) {
+        markerRef.current = L.marker([parseFloat(lat), parseFloat(lng)], { draggable: true })
+          .addTo(map);
+        markerRef.current.on('dragend', e => {
+          const { lat: la, lng: lo } = e.target.getLatLng();
+          onChange({ location: query, lat: parseFloat(la.toFixed(6)), lng: parseFloat(lo.toFixed(6)) });
+        });
+      }
+
+      map.on('click', e => {
+        const { lat: la, lng: lo } = e.latlng;
+        const pos = { lat: parseFloat(la.toFixed(6)), lng: parseFloat(lo.toFixed(6)) };
+        if (markerRef.current) markerRef.current.setLatLng([pos.lat, pos.lng]);
+        else markerRef.current = L.marker([pos.lat, pos.lng], { draggable: true }).addTo(map);
+        markerRef.current.on('dragend', ev => {
+          const { lat: dla, lng: dlo } = ev.target.getLatLng();
+          onChange({ location: query, lat: parseFloat(dla.toFixed(6)), lng: parseFloat(dlo.toFixed(6)) });
+        });
+        onChange({ location: query, lat: pos.lat, lng: pos.lng });
+      });
+
+      instanceRef.current = map;
+    }).catch(() => {});
+
+    return () => {
+      mountedRef.current = false;
+      if (instanceRef.current) { instanceRef.current.remove(); instanceRef.current = null; }
+    };
+  }, []);
+
+  // If lat/lng change externally, move marker
+  useEffect(() => {
+    if (!instanceRef.current || !lat || !lng) return;
+    const L  = window.L;
+    const pos = [parseFloat(lat), parseFloat(lng)];
+    if (markerRef.current) {
+      markerRef.current.setLatLng(pos);
+    } else {
+      markerRef.current = L.marker(pos, { draggable: true }).addTo(instanceRef.current);
+    }
+    instanceRef.current.setView(pos, 12);
+  }, [lat, lng]);
+
+  async function handleSearch() {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true); setSearchErr(''); setResults([]);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
+      );
+      const data = await res.json();
+      if (!mountedRef.current) return;
+      if (!data.length) setSearchErr('No results found.');
+      else setResults(data);
+    } catch { if (mountedRef.current) setSearchErr('Search failed. Check your connection.'); }
+    finally  { if (mountedRef.current) setSearching(false); }
+  }
+
+  function handleSelect(r) {
+    const la = parseFloat(parseFloat(r.lat).toFixed(6));
+    const lo = parseFloat(parseFloat(r.lon).toFixed(6));
+    const name = r.display_name.split(',').slice(0, 2).join(',').trim();
+    setQuery(name);
+    setResults([]);
+    onChange({ location: name, lat: la, lng: lo });
+  }
+
+  return (
+    <div className="clp-wrap">
+      {/* Search bar */}
+      <div className="clp-search-row">
+        <input
+          className="clp-input"
+          type="text"
+          placeholder="Search city, address, facility…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
+        />
+        <button type="button" className="btn-admin-primary clp-btn" onClick={handleSearch} disabled={searching}>
+          {searching ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
+          {searching ? ' Searching…' : ' Search'}
+        </button>
+      </div>
+
+      {searchErr && <p className="clp-err"><i className="fa-solid fa-triangle-exclamation"></i> {searchErr}</p>}
+
+      {results.length > 0 && (
+        <ul className="clp-results">
+          {results.map(r => (
+            <li key={r.place_id} className="clp-result-item" onClick={() => handleSelect(r)}>
+              <i className="fa-solid fa-location-dot"></i> {r.display_name}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Map */}
+      <div ref={mapRef} className="clp-map"></div>
+
+      {lat && lng && (
+        <p className="field-hint" style={{ color: 'var(--green)', marginTop: '8px' }}>
+          <i className="fa-solid fa-check-circle"></i> Pin set: {query || 'Custom location'} ({parseFloat(lat).toFixed(4)}, {parseFloat(lng).toFixed(4)})
+          &nbsp;— drag the pin to fine-tune
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Status → progress step mapping (auto, no manual input needed)
 const STATUSES = [
   { value: 'pending',      label: 'Pending',         icon: 'fa-clock',                step: 0 },
@@ -1057,78 +1210,21 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               <div className="form-section">
                 <div className="form-section-title">
                   <span className="form-step-num">7</span>
-                  Live Map
+                  Live Map — Current Location
                 </div>
                 <p className="section-desc">
-                  Map coordinates are set automatically from the Origin and Destination you typed above.
+                  Search for where the package is right now. This pin is shown to customers on the tracking page.
                 </p>
 
-                <div className="map-auto-status">
-                  <div className={`map-auto-item ${form.origin_lat ? 'ready' : 'waiting'}`}>
-                    <span className="map-dot origin"></span>
-                    <div>
-                      <div className="map-auto-label">Pickup Location</div>
-                      <div className="map-auto-value">
-                        {form.origin_lat
-                          ? `✓ ${form.origin} (${parseFloat(form.origin_lat).toFixed(4)}, ${parseFloat(form.origin_lng).toFixed(4)})`
-                          : 'Will sync when you type Origin above'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="map-auto-arrow">→</div>
-                  <div className={`map-auto-item ${form.dest_lat ? 'ready' : 'waiting'}`}>
-                    <span className="map-dot dest"></span>
-                    <div>
-                      <div className="map-auto-label">Delivery Destination</div>
-                      <div className="map-auto-value">
-                        {form.dest_lat
-                          ? `✓ ${form.destination} (${parseFloat(form.dest_lat).toFixed(4)}, ${parseFloat(form.dest_lng).toFixed(4)})`
-                          : 'Will sync when you type Destination above'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pickup & Delivery time sync status */}
-                <div className="map-auto-status" style={{ marginTop: '10px' }}>
-                  <div className={`map-auto-item ${form.pickup_time ? 'ready' : 'waiting'}`}>
-                    <span className="map-dot pkg"></span>
-                    <div>
-                      <div className="map-auto-label">Pickup Time</div>
-                      <div className="map-auto-value">
-                        {form.pickup_time
-                          ? `✓ ${new Date(form.pickup_time).toLocaleString()}`
-                          : 'Set Pickup Date & Time above'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="map-auto-arrow">→</div>
-                  <div className={`map-auto-item ${form.delivery_time ? 'ready' : 'waiting'}`}>
-                    <span className="map-dot dest"></span>
-                    <div>
-                      <div className="map-auto-label">Expected Delivery</div>
-                      <div className="map-auto-value">
-                        {form.delivery_time
-                          ? `✓ ${new Date(form.delivery_time).toLocaleString()}`
-                          : 'Set Expected Delivery above'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {form.origin_lat && form.dest_lat && form.pickup_time && form.delivery_time ? (
-                  <p className="field-hint" style={{ marginTop: '12px', color: 'var(--green)' }}>
-                    <i className="fa-solid fa-check-circle"></i> Route and timing are set — the plane will move in real time on the customer's tracking page.
-                  </p>
-                ) : form.origin_lat && form.dest_lat ? (
-                  <p className="field-hint" style={{ marginTop: '12px', color: 'var(--orange)' }}>
-                    <i className="fa-solid fa-triangle-exclamation"></i> Route is set but no timing — the plane will loop continuously. Set Pickup &amp; Delivery times above for real-time movement.
-                  </p>
-                ) : (
-                  <p className="field-hint" style={{ marginTop: '12px' }}>
-                    <i className="fa-solid fa-circle-info"></i> Type the Origin and Destination above to set up the live map.
-                  </p>
-                )}
+                {/* Search input */}
+                <CurrentLocationPicker
+                  value={form.current_location || ''}
+                  lat={form.map_lat}
+                  lng={form.map_lng}
+                  onChange={({ location, lat, lng }) =>
+                    setForm(f => ({ ...f, current_location: location, map_lat: lat, map_lng: lng }))
+                  }
+                />
               </div>
 
               {/* ── SECTION 6: Package Image ── */}
