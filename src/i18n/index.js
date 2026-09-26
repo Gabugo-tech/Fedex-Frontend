@@ -18,7 +18,15 @@ export function detectLanguage() {
 
 /**
  * Get translation strings for a given language code.
+ * Missing keys fall back to English so the UI never renders blank strings.
  */
 export function getT(langCode) {
-  return (LANGUAGES[langCode] || LANGUAGES.en).translations;
+  const base = LANGUAGES.en.translations;
+  const lang = (LANGUAGES[langCode] || LANGUAGES.en).translations;
+  // Merge: use English as fallback for any key missing in the target language
+  return new Proxy(lang, {
+    get(target, key) {
+      return key in target ? target[key] : base[key];
+    },
+  });
 }

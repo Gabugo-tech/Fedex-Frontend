@@ -4,7 +4,7 @@ const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
 function loadLeaflet() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!document.getElementById('leaflet-css')) {
       const link = Object.assign(document.createElement('link'), {
         id: 'leaflet-css', rel: 'stylesheet', href: LEAFLET_CSS,
@@ -21,7 +21,8 @@ function loadLeaflet() {
     const script = Object.assign(document.createElement('script'), {
       id: 'leaflet-js', src: LEAFLET_JS,
     });
-    script.onload = resolve;
+    script.onload  = resolve;
+    script.onerror = () => reject(new Error('Failed to load Leaflet. Check your connection.'));
     document.head.appendChild(script);
   });
 }
@@ -40,6 +41,7 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching]       = useState(false);
   const [searchError, setSearchError]   = useState(null);
+  const [mapError, setMapError]         = useState(null);
   const searchDebounceRef = useRef(null);
 
   useEffect(() => {
@@ -47,6 +49,8 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
     loadLeaflet().then(() => {
       if (!mountedRef.current || !mapRef.current) return;
       initMap();
+    }).catch(err => {
+      if (mountedRef.current) setMapError(err.message);
     });
     return () => {
       mountedRef.current = false;
@@ -95,7 +99,7 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
-        { headers: { 'Accept-Language': 'en' } }
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
       );
       const data = await res.json();
       if (!mountedRef.current) return;
@@ -199,7 +203,17 @@ export default function AdminMapPicker({ initialLat, initialLng, onConfirm, onCl
         </p>
 
         {/* MAP */}
-        <div ref={mapRef} className="map-picker-map"></div>
+        <div ref={mapRef} className="map-picker-map">
+          {mapError && (
+            <div style={{
+              height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: '8px', color: '#888', fontSize: '14px',
+            }}>
+              <i className="fa-solid fa-triangle-exclamation" style={{ color: '#e55', fontSize: '24px' }}></i>
+              <span>{mapError}</span>
+            </div>
+          )}
+        </div>
 
         {/* CURRENT COORDS */}
         <div className="map-picker-coords">

@@ -83,7 +83,7 @@ export default function Hero({ onTrack, loading, error }) {
             {/* Fix #33: add aria-live so screen readers announce errors */}
             {inputError && (
               <p role="alert" aria-live="assertive" className="error-hint">
-                {t.trackPlaceholder}
+                <i className="fa-solid fa-triangle-exclamation"></i> Please enter a tracking number.
               </p>
             )}
 
