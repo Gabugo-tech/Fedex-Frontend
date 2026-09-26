@@ -202,10 +202,16 @@ export default function ResultCard({ result, steps }) {
           <div className="info-block-icon"><i className="fa-solid fa-route"></i></div>
           <div>
             <div className="info-block-label">{t.route}</div>
-            <div className="info-block-value">{result.destination}</div>
-            <div className="info-block-sub">
-              <i className="fa-solid fa-arrow-right-long" style={{ fontSize: '10px', marginRight: '4px' }}></i>
-              {t.from} {result.origin}
+            <div className="info-block-route-row">
+              <div className="info-block-route-point">
+                <span className="route-point-tag origin-tag">FROM</span>
+                <span className="info-block-value">{result.origin}</span>
+              </div>
+              <i className="fa-solid fa-arrow-right route-arrow"></i>
+              <div className="info-block-route-point">
+                <span className="route-point-tag dest-tag">TO</span>
+                <span className="info-block-value">{result.destination}</span>
+              </div>
             </div>
           </div>
         </div>

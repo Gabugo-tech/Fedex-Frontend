@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
+import { getJourneyFraction } from '../utils/mapMath';
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
-const PURPLE_HEX = '#4d148c';
+const PURPLE_HEX = '#a78bfa';
 const ORANGE_HEX = '#ff6200';
-const GREEN_HEX  = '#00843d';
-const RED_HEX    = '#d0021b';
+const GREEN_HEX  = '#22c55e';
+const RED_HEX    = '#ef4444';
 
 // ── Leaflet loader ───────────────────────────────────────
 function loadLeaflet(cancelRef) {
@@ -35,31 +35,56 @@ function loadLeaflet(cancelRef) {
   });
 }
 
-// ── Curved arc (quadratic bezier) ───────────────────────
-// Bug fix #6: returns the control point too so we can fitBounds on the full arc
-function buildArc(lat1, lng1, lat2, lng2, steps = 200) {
-  const midLat  = (lat1 + lat2) / 2;
-  const midLng  = (lng1 + lng2) / 2;
-  const dist    = Math.hypot(lat2 - lat1, lng2 - lng1);
-  const curveH  = dist * 0.18;
-  const dx = lat2 - lat1, dy = lng2 - lng1;
-  const len = Math.hypot(dx, dy) || 1;
-  const ctrlLat = midLat + (dy / len) * curveH;
-  const ctrlLng = midLng - (dx / len) * curveH;
+// ── Great-circle arc (slerp-style interpolation on a sphere) ────────────────
+// Much more realistic than a flat quadratic bezier for long routes
+function buildGreatCircleArc(lat1, lng1, lat2, lng2, steps = 300) {
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+
+  const φ1 = toRad(lat1), λ1 = toRad(lng1);
+  const φ2 = toRad(lat2), λ2 = toRad(lng2);
+
+  // Convert to 3D unit vectors
+  const x1 = Math.cos(φ1) * Math.cos(λ1);
+  const y1 = Math.cos(φ1) * Math.sin(λ1);
+  const z1 = Math.sin(φ1);
+
+  const x2 = Math.cos(φ2) * Math.cos(λ2);
+  const y2 = Math.cos(φ2) * Math.sin(λ2);
+  const z2 = Math.sin(φ2);
+
+  // Angle between the two points
+  const dot = Math.min(1, Math.max(-1, x1*x2 + y1*y2 + z1*z2));
+  const omega = Math.acos(dot);
 
   const points = [];
-  for (let i = 0; i <= steps; i++) {
-    const t   = i / steps;
-    const lat = (1-t)*(1-t)*lat1 + 2*(1-t)*t*ctrlLat + t*t*lat2;
-    const lng = (1-t)*(1-t)*lng1 + 2*(1-t)*t*ctrlLng + t*t*lng2;
-    points.push({ lat, lng });
+
+  if (omega < 0.001) {
+    // Points are basically the same — straight line
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      points.push({ lat: lat1 + (lat2 - lat1) * t, lng: lng1 + (lng2 - lng1) * t });
+    }
+    return points;
   }
-  // include the control point in returned data for bounds calculation
-  points._ctrl = { lat: ctrlLat, lng: ctrlLng };
+
+  const sinOmega = Math.sin(omega);
+
+  for (let i = 0; i <= steps; i++) {
+    const t  = i / steps;
+    const a  = Math.sin((1 - t) * omega) / sinOmega;
+    const b  = Math.sin(t * omega) / sinOmega;
+    const x  = a * x1 + b * x2;
+    const y  = a * y1 + b * y2;
+    const z  = a * z1 + b * z2;
+    const φ  = Math.atan2(z, Math.sqrt(x*x + y*y));
+    const λ  = Math.atan2(y, x);
+    points.push({ lat: toDeg(φ), lng: toDeg(λ) });
+  }
   return points;
 }
 
-// ── Bearing ──────────────────────────────────────────────
+// ── Bearing between two lat/lng points ───────────────────
 function getBearing(lat1, lng1, lat2, lng2) {
   const toRad = d => d * Math.PI / 180;
   const φ1 = toRad(lat1), φ2 = toRad(lat2);
@@ -69,17 +94,7 @@ function getBearing(lat1, lng1, lat2, lng2) {
   return ((Math.atan2(x, y) * 180 / Math.PI) + 360) % 360;
 }
 
-// ── Format remaining time ────────────────────────────────
-function formatRemaining(deliveryTime) {
-  const ms = new Date(deliveryTime).getTime() - Date.now();
-  if (ms <= 0) return 'Arrived';
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
-}
-
-// ── Smooth interpolation between two arc points ──────────
-// Bug fix #2: allows sub-index decimal position for smooth real-time movement
+// ── Smooth arc interpolation ─────────────────────────────
 function interpolateArc(arc, t) {
   const maxIdx = arc.length - 1;
   const raw    = t * maxIdx;
@@ -91,6 +106,15 @@ function interpolateArc(arc, t) {
     lng: arc[lo].lng + (arc[hi].lng - arc[lo].lng) * frac,
     idx: lo,
   };
+}
+
+// ── Format remaining time ────────────────────────────────
+function formatRemaining(deliveryTime) {
+  const ms = new Date(deliveryTime).getTime() - Date.now();
+  if (ms <= 0) return 'Arrived';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
 }
 
 // ── Component ────────────────────────────────────────────
@@ -122,8 +146,8 @@ export default function TrackingMap({
   }, [deliveryTime]);
 
   useEffect(() => {
-    const hasRoute      = originLat && originLng && destLat && destLng;
-    const hasPos        = lat && lng;
+    const hasRoute = originLat && originLng && destLat && destLng;
+    const hasPos   = lat && lng;
     if (!hasRoute && !hasPos) return;
 
     cancelledRef.current = false;
@@ -135,8 +159,8 @@ export default function TrackingMap({
     loadLeaflet(cancelledRef).then(() => {
       if (cancelledRef.current || !mapRef.current) return;
 
-      if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
-      if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
+      if (animRef.current)     { clearInterval(animRef.current); animRef.current = null; }
+      if (instanceRef.current) { instanceRef.current.remove();   instanceRef.current = null; }
 
       const L   = window.L;
       const map = L.map(mapRef.current, {
@@ -145,54 +169,87 @@ export default function TrackingMap({
         attributionControl: true,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(map);
+      // ── Dark styled tile layer (CartoDB Dark Matter, no API key needed) ──
+      L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 19,
+        }
+      ).addTo(map);
 
       instanceRef.current = map;
       setMapLoading(false);
 
       if (hasRoute) {
-        const arc     = buildArc(originLat, originLng, destLat, destLng, 200);
+        // ── Great-circle arc ──────────────────────────────────────────────
+        const arc     = buildGreatCircleArc(originLat, originLng, destLat, destLng, 300);
         const latlngs = arc.map(p => [p.lat, p.lng]);
 
-        // Bug fix #6: fit bounds including the arc control point so full curve is visible
-        const ctrl = arc._ctrl;
-        const bounds = L.latLngBounds([
-          [originLat, originLng],
-          [destLat,   destLng],
-          [ctrl.lat,  ctrl.lng],
-        ]);
-        map.fitBounds(bounds, { padding: [48, 48] });
+        // Fit bounds to show the full route
+        const bounds = L.latLngBounds(latlngs);
+        map.fitBounds(bounds, { padding: [52, 52] });
 
-        // Dashed full-route line
+        // Ghost route line — subtle dashed track
         L.polyline(latlngs, {
-          color: '#c0b0e0', weight: 2.5, dashArray: '7 5', opacity: 0.7,
+          color: '#4a4a6a',
+          weight: 2,
+          dashArray: '6 6',
+          opacity: 0.6,
         }).addTo(map);
 
-        // Origin marker — GREEN
+        // ── Origin marker ─────────────────────────────────────────────────
         L.marker([originLat, originLng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="width:14px;height:14px;border-radius:50%;background:${GREEN_HEX};border:3px solid #fff;box-shadow:0 0 0 2px ${GREEN_HEX}"></div>`,
-            iconSize: [14, 14], iconAnchor: [7, 7],
+            html: `<div style="
+              width:13px;height:13px;border-radius:50%;
+              background:${GREEN_HEX};
+              border:2.5px solid #fff;
+              box-shadow:0 0 0 3px ${GREEN_HEX}55,0 0 8px ${GREEN_HEX}88;
+            "></div>`,
+            iconSize: [13, 13], iconAnchor: [6, 6],
           }),
         }).addTo(map).bindPopup('<strong>Origin</strong>');
 
-        // Destination marker — RED
+        // ── Destination marker ────────────────────────────────────────────
         L.marker([destLat, destLng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="width:14px;height:14px;border-radius:50%;background:${RED_HEX};border:3px solid #fff;box-shadow:0 0 0 2px ${RED_HEX}"></div>`,
-            iconSize: [14, 14], iconAnchor: [7, 7],
+            html: `<div style="
+              width:13px;height:13px;border-radius:50%;
+              background:${RED_HEX};
+              border:2.5px solid #fff;
+              box-shadow:0 0 0 3px ${RED_HEX}55,0 0 8px ${RED_HEX}88;
+            "></div>`,
+            iconSize: [13, 13], iconAnchor: [6, 6],
           }),
         }).addTo(map).bindPopup('<strong>Destination</strong>');
 
-        // Plane marker
+        // ── Plane icon (SVG so we can rotate it cleanly) ──────────────────
+        const planeSVG = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="38" height="38">
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <g filter="url(#glow)">
+              <!-- plane body -->
+              <path d="M32 4 L40 28 L60 34 L40 36 L38 56 L32 50 L26 56 L24 36 L4 34 L24 28 Z"
+                fill="${ORANGE_HEX}" stroke="#fff" stroke-width="1.5"/>
+            </g>
+          </svg>`;
+
         const pkgIcon = L.divIcon({
           className: 'plane-marker-wrap',
-          html: `<div class="plane-marker-inner">✈</div>`,
-          iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18],
+          html: `<div class="plane-marker-inner" style="
+            width:38px;height:38px;
+            transform-origin:50% 50%;
+            filter:drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+            transition:transform 0.15s linear;
+          ">${planeSVG}</div>`,
+          iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -22],
         });
 
         // Starting position
@@ -207,23 +264,21 @@ export default function TrackingMap({
           .addTo(map)
           .bindPopup(`<strong>${labelRef.current || 'Package'}</strong>`);
 
-        // Travelled trail — Bug fix #4: start with full trail to startFrac
+        // Travelled trail (glowing purple line behind the plane)
         const trailPoints = arc.slice(0, startPos.idx + 1).map(p => [p.lat, p.lng]);
         const trailLayer  = L.polyline(trailPoints, {
-          color: PURPLE_HEX, weight: 3, opacity: 0.7,
+          color: PURPLE_HEX,
+          weight: 3,
+          opacity: 0.85,
         }).addTo(map);
 
-        // Bug fix #1: use bearing-to-north offset
-        // ✈ emoji faces UP (north) in most fonts, bearing 0 = North, so offset = 0
-        // We use 0 offset and rotate purely by bearing
+        // ── Rotate helper ─────────────────────────────────────────────────
+        // The SVG plane points UP (north). Bearing 0 = north → offset 0.
         function rotatePlane(bearing) {
           const el = marker.getElement();
           if (!el) return;
-          const inner  = el.querySelector('.plane-marker-inner');
-          const target = inner || el;
-          target.style.transformOrigin = '50% 50%';
-          // ✈ in most browsers points up-right (~45°), so subtract 45
-          target.style.transform = `rotate(${bearing - 45}deg)`;
+          const inner = el.querySelector('.plane-marker-inner');
+          if (inner) inner.style.transform = `rotate(${bearing}deg)`;
         }
 
         // Set initial bearing
@@ -231,92 +286,97 @@ export default function TrackingMap({
           const prev = arc[startPos.idx - 1];
           rotatePlane(getBearing(prev.lat, prev.lng, startPos.lat, startPos.lng));
         } else {
-          // Point toward destination from origin
           rotatePlane(getBearing(originLat, originLng, destLat, destLng));
         }
 
-        // Fix #20: pause animation when tab is hidden to save CPU
+        // ── Animation loop ────────────────────────────────────────────────
+        const isDelivered = status === 'delivered';
+        // Use float index for smooth sub-step movement
+        let floatIdx  = startPos.idx;
+        let fadeSteps = 0;
+        const FADE_STEPS = 30;
+        // Speed: ~300 steps in ~18 seconds = smooth continuous loop
+        const STEP_PER_TICK = isDelivered ? 0 : 0.6;
+        const TICK_MS       = 60; // ~16fps
+
+        // Pause when tab is hidden
         const handleVisibility = () => {
           if (document.hidden) {
             if (animRef.current) { clearInterval(animRef.current); animRef.current = null; }
+          } else if (!isDelivered && !animRef.current) {
+            startAnim();
           }
         };
         document.addEventListener('visibilitychange', handleVisibility);
-        // Always animate smoothly (loop). If real-time window is set,
-        // snap to the correct real-time position every second as well.
-        const isDelivered = status === 'delivered';
-        let idx       = startPos.idx;
-        let fadeSteps = 0;
-        const FADE_STEPS = 20;
-        const STEP_MS    = isDelivered ? 50 : 120;
 
-        animRef.current = setInterval(() => {
-          if (cancelledRef.current) {
-            clearInterval(animRef.current); animRef.current = null; return;
-          }
+        function startAnim() {
+          animRef.current = setInterval(() => {
+            if (cancelledRef.current) {
+              clearInterval(animRef.current); animRef.current = null; return;
+            }
 
-          // If real-time window is valid, override position with clock-based position
-          if (hasTimeWindow) {
-            const frac = getJourneyFraction(pickupTime, deliveryTime);
-            if (frac !== null && frac < 1) {
-              const pos = interpolateArc(arc, frac);
-              // Only update idx if it differs, to avoid jitter
-              if (pos.idx !== idx) {
-                idx = pos.idx;
-                marker.setLatLng([pos.lat, pos.lng]);
-                trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
-                if (idx > 0) {
-                  const prev = arc[idx - 1];
-                  rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
-                }
+            // If real-time window is set, keep in sync with clock
+            if (hasTimeWindow) {
+              const frac = getJourneyFraction(pickupTime, deliveryTime);
+              if (frac !== null && frac < 1) {
+                const realIdx = frac * (arc.length - 1);
+                // Don't let the visual loop fall too far behind real time
+                if (floatIdx < realIdx - 5) floatIdx = realIdx;
               }
             }
-          }
 
-          // Always step forward for visible movement
-          idx += 1;
+            floatIdx += STEP_PER_TICK;
 
-          if (idx > arc.length - 1) {
-            if (isDelivered) {
-              idx = arc.length - 1;
-              clearInterval(animRef.current); animRef.current = null; return;
-            } else {
+            if (floatIdx >= arc.length - 1) {
+              if (isDelivered) {
+                floatIdx = arc.length - 1;
+                clearInterval(animRef.current); animRef.current = null; return;
+              }
+
+              // Fade out trail, then loop back
               fadeSteps++;
               trailLayer.setStyle({
-                opacity: Math.max(0, 0.7 - (fadeSteps / FADE_STEPS) * 0.7),
+                opacity: Math.max(0, 0.85 - (fadeSteps / FADE_STEPS) * 0.85),
               });
+
               if (fadeSteps >= FADE_STEPS) {
-                // If real-time window is set, restart from real position
+                // Restart from real-time position or beginning
                 if (hasTimeWindow) {
                   const frac = getJourneyFraction(pickupTime, deliveryTime);
-                  idx = frac !== null ? Math.floor(frac * (arc.length - 1)) : 0;
+                  floatIdx = frac !== null ? frac * (arc.length - 1) : 0;
                 } else {
-                  idx = 0;
+                  floatIdx = 0;
                 }
                 fadeSteps = 0;
-                trailLayer.setLatLngs(arc.slice(0, idx + 1).map(p => [p.lat, p.lng]));
-                trailLayer.setStyle({ opacity: 0.7 });
+                trailLayer.setLatLngs(arc.slice(0, Math.floor(floatIdx) + 1).map(p => [p.lat, p.lng]));
+                trailLayer.setStyle({ opacity: 0.85 });
                 rotatePlane(getBearing(originLat, originLng, destLat, destLng));
               }
               return;
             }
-          }
 
-          const pos = arc[idx];
-          marker.setLatLng([pos.lat, pos.lng]);
-          trailLayer.addLatLng([pos.lat, pos.lng]);
-          if (idx > 0) {
-            const prev = arc[idx - 1];
+            const pos = interpolateArc(arc, floatIdx / (arc.length - 1));
+            marker.setLatLng([pos.lat, pos.lng]);
+
+            // Update trail to current position
+            trailLayer.setLatLngs(arc.slice(0, Math.floor(floatIdx) + 1).map(p => [p.lat, p.lng]));
+
+            // Bearing from previous to current for rotation
+            const prevIdx = Math.max(0, Math.floor(floatIdx) - 1);
+            const prev    = arc[prevIdx];
             rotatePlane(getBearing(prev.lat, prev.lng, pos.lat, pos.lng));
-          }
-        }, STEP_MS);
+          }, TICK_MS);
+        }
+
+        if (!isDelivered) startAnim();
 
       } else if (hasPos) {
+        // Fallback: single pin, no route
         map.setView([lat, lng], 7);
         L.marker([lat, lng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">📍</div>`,
+            html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">📍</div>`,
             iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
           }),
         }).addTo(map)
@@ -325,15 +385,17 @@ export default function TrackingMap({
       }
     }).catch(() => {});
 
+    // Cleanup
+    let handleVisibility;
     return () => {
       cancelledRef.current = true;
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (animRef.current)    { clearInterval(animRef.current); animRef.current = null; }
-      if (instanceRef.current){ instanceRef.current.remove();   instanceRef.current = null; }
+      if (handleVisibility) document.removeEventListener('visibilitychange', handleVisibility);
+      if (animRef.current)     { clearInterval(animRef.current); animRef.current = null; }
+      if (instanceRef.current) { instanceRef.current.remove();   instanceRef.current = null; }
     };
   }, [lat, lng, originLat, originLng, destLat, destLng, status, pickupTime, deliveryTime]);
 
-  const canShow    = (originLat && originLng && destLat && destLng) || (lat && lng);
+  const canShow = (originLat && originLng && destLat && destLng) || (lat && lng);
   if (!canShow) return null;
 
   const isLive     = status === 'in-transit' || status === 'out-delivery';
@@ -368,7 +430,6 @@ export default function TrackingMap({
             <p>Loading map…</p>
           </div>
         )}
-        {/* Fix #44: add role and aria-label for accessibility */}
         <div
           ref={mapRef}
           className="tracking-map"
