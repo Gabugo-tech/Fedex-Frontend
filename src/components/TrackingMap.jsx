@@ -169,15 +169,22 @@ export default function TrackingMap({
         attributionControl: true,
       });
 
-      // ── Dark styled tile layer (CartoDB Dark Matter, no API key needed) ──
+      // ── Tile layer: standard OSM with CSS dark invert filter ──
+      // No API key needed. The CSS filter on the map container inverts + hue-shifts
+      // the tiles to produce a clean dark theme.
       L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: 'abcd',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
         }
       ).addTo(map);
+
+      // Apply dark filter to the tile layer pane only (keeps markers/UI unaffected)
+      const tilePane = mapRef.current.querySelector('.leaflet-tile-pane');
+      if (tilePane) {
+        tilePane.style.filter = 'invert(1) hue-rotate(200deg) brightness(0.85) saturate(0.7)';
+      }
 
       instanceRef.current = map;
       setMapLoading(false);
