@@ -444,8 +444,13 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     if (expandedId === s.id) {
       setExpandedId(null);
       setExpandedData(null);
+      setLocationForm({ map_lat: '', map_lng: '', current_location: '' });
+      setEventForm(makeEmptyEvent());
     } else {
       setExpandedId(s.id);
+      setExpandedData(null);
+      setLocationForm({ map_lat: '', map_lng: '', current_location: '' });
+      setEventForm(makeEmptyEvent());
       loadExpanded(s.id);
     }
   }
@@ -453,6 +458,10 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   // ── UPDATE LOCATION ───────────────────────────────────
   async function handleUpdateLocation(e) {
     e.preventDefault();
+    if (!locationForm.map_lat || !locationForm.map_lng) {
+      toast_show('Please search for a location and pick a pin on the map first', 'error');
+      return;
+    }
     setSaving(true);
     try {
       await updateLocation(expandedId, locationForm, tokenRef.current);
@@ -503,6 +512,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   async function handleImageUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
+    const shipmentId = expandedId; // capture before async
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedTypes.includes(file.type)) {
@@ -522,10 +532,9 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(file);
       });
-      await uploadImage(expandedId, { base64, mimeType: file.type }, tokenRef.current);
+      await uploadImage(shipmentId, { base64, mimeType: file.type }, tokenRef.current);
       toast_show('Image uploaded successfully');
-      loadExpanded(expandedId);
-      loadShipments();
+      if (shipmentId) { loadExpanded(shipmentId); loadShipments(); }
     } catch (err) {
       toast_show(err.message || 'Upload failed', 'error');
     } finally {
@@ -535,11 +544,11 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
 
   async function handleImageDelete() {
     if (!window.confirm('Remove this image?')) return;
+    const shipmentId = expandedId; // capture before async
     try {
-      await deleteImage(expandedId, tokenRef.current);
+      await deleteImage(shipmentId, tokenRef.current);
       toast_show('Image removed');
-      loadExpanded(expandedId);
-      loadShipments();
+      if (shipmentId) { loadExpanded(shipmentId); loadShipments(); }
     } catch (err) {
       toast_show(err.message, 'error');
     }
@@ -711,23 +720,14 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                                 This moves the pin on the customer's live map.
                               </p>
                               <form onSubmit={handleUpdateLocation}>
-                                <div className="form-group">
-                                  <label>Where is the package now?</label>
-                                  <input type="text"
-                                    placeholder="e.g. Chicago, IL — Sorting Facility"
-                                    value={locationForm.current_location}
-                                    onChange={e => setLocationForm(f => ({ ...f, current_location: e.target.value }))} />
-                                </div>
-                                <button type="button" className="btn-map-pick-simple"
-                                  onClick={() => setMapPicker('location')}>
-                                  <i className="fa-solid fa-map-location-dot"></i> Pick location on map
-                                </button>
-                                {(locationForm.map_lat && locationForm.map_lng) && (
-                                  <p className="coords-preview">
-                                    <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
-                                    &nbsp;Pin set: {parseFloat(locationForm.map_lat).toFixed(4)}, {parseFloat(locationForm.map_lng).toFixed(4)}
-                                  </p>
-                                )}
+                                <CurrentLocationPicker
+                                  value={locationForm.current_location || ''}
+                                  lat={locationForm.map_lat}
+                                  lng={locationForm.map_lng}
+                                  onChange={({ location, lat, lng }) =>
+                                    setLocationForm(f => ({ ...f, current_location: location, map_lat: lat, map_lng: lng }))
+                                  }
+                                />
                                 <button type="submit" className="btn-admin-primary" disabled={saving} style={{ marginTop: '12px' }}>
                                   {saving
                                     ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</>
