@@ -1114,47 +1114,56 @@ a:hover { color: var(--orange); }
 
 /* ===== TRACKING MAP (user-facing) ===== */
 .tracking-map-section {
-  padding: 24px 28px; border-top: 1px solid var(--gray-200);
+  border-top: 1px solid var(--gray-200);
+  overflow: hidden;
 }
-.tracking-map-section h4 {
-  font-size: 13px; font-weight: 700; color: var(--gray-400);
-  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
-  display: flex; align-items: center; gap: 7px;
+.tm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px 12px; background: #fafafa;
+  border-bottom: 1px solid var(--gray-200);
 }
-.tracking-map {
-  width: 100%; height: 320px; border-radius: 12px; overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-  border: 1px solid rgba(255,255,255,0.07);
-}
-/* Dark overlay tint on the Leaflet attribution so it stays readable on dark tiles */
-.tracking-map .leaflet-control-attribution {
-  background: rgba(0,0,0,0.55) !important;
-  color: #aaa !important;
-  font-size: 10px !important;
-}
-.tracking-map .leaflet-control-attribution a { color: #bbb !important; }
-
-/* Map loading placeholder */
-.map-loading-placeholder {
-  width: 100%; height: 320px; border-radius: 12px;
-  background: #1a1a2e;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; color: #888;
-}
-
-.tracking-map-label {
-  font-size: 13px; color: var(--gray-600); margin-top: 10px;
+.tm-title {
+  font-size: 14px; font-weight: 700; color: var(--gray-800);
   display: flex; align-items: center; gap: 6px;
 }
-
-/* Plane marker — no default Leaflet white box */
-.plane-marker-wrap { background: transparent !important; border: none !important; }
-
-/* Custom map marker */
-.map-marker {
-  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-  color: var(--purple); font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+.tm-status-chip {
+  font-size: 12px; font-weight: 600; color: var(--gray-600);
+  display: flex; align-items: center; gap: 5px;
 }
+.tm-chip-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+}
+.tm-chip-green  { background: #22c55e; }
+.tm-chip-gray   { background: #9ca3af; }
+.tm-chip-orange { background: #ff6200; }
+.tm-chip-pulse  { animation: pulse 1.4s infinite; }
+
+.tracking-map {
+  width: 100%; height: 300px; overflow: hidden;
+}
+.tracking-map .leaflet-control-attribution {
+  font-size: 10px !important;
+}
+
+.map-loading-placeholder {
+  width: 100%; height: 300px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; color: #888; background: #f5f5f5;
+}
+
+.tm-legend {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 20px; font-size: 12px; color: var(--gray-600);
+  border-top: 1px solid var(--gray-200); background: #fafafa;
+}
+.tm-legend-item { display: flex; align-items: center; }
+.tm-legend-label {
+  margin-left: auto; font-size: 12px; color: var(--gray-500);
+  font-style: italic;
+}
+
+/* Plane marker — keep transparent for old maps */
+.plane-marker-wrap { background: transparent !important; border: none !important; }
 
 /* ===== ADMIN RESPONSIVE — handled in main responsive block above ===== */
 
@@ -1287,8 +1296,8 @@ a:hover { color: var(--orange); }
   display: inline-block; width: 10px; height: 10px;
   border-radius: 50%; margin-right: 4px; vertical-align: middle;
 }
-.legend-dot.origin { background: #22c55e; box-shadow: 0 0 5px #22c55e88; }
-.legend-dot.dest   { background: #ef4444; box-shadow: 0 0 5px #ef444488; }
+.legend-dot.origin { background: #ef4444; box-shadow: 0 0 5px #ef444488; }
+.legend-dot.dest   { background: #ff6200; box-shadow: 0 0 5px #ff620088; }
 .legend-dot.pkg    { background: #a78bfa; box-shadow: 0 0 5px #a78bfa88; }
 .tracking-map-label-text {
   display: flex; align-items: center; gap: 5px; margin-left: auto;
