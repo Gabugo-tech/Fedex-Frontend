@@ -1,74 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react';
 import TrackingMap from './TrackingMap';
 import { useLang } from '../i18n/LanguageContext';
+import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
 
-// ── Lightbox image component ──────────────────────────────
+// ── Lightbox ──────────────────────────────────────────────
 function ItemImage({ url }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <div className="item-image-section">
-        <h4>
-          <i className="fa-solid fa-image"></i> Item Photo
+        <h4><i className="fa-solid fa-image"></i> Item Photo
           <span className="item-image-tap-hint">tap to expand</span>
         </h4>
-        <img
-          src={url}
-          alt="Shipment item"
-          className="item-image item-image-clickable"
-          onClick={() => setOpen(true)}
-        />
+        <img src={url} alt="Shipment item" className="item-image item-image-clickable"
+          onClick={() => setOpen(true)} />
       </div>
       {open && (
         <div className="lightbox-overlay" onClick={() => setOpen(false)}>
           <button className="lightbox-close" onClick={() => setOpen(false)} aria-label="Close">
             <i className="fa-solid fa-xmark"></i>
           </button>
-          <img
-            src={url}
-            alt="Shipment item full size"
-            className="lightbox-image"
-            onClick={e => e.stopPropagation()}
-          />
+          <img src={url} alt="Shipment item full size" className="lightbox-image"
+            onClick={e => e.stopPropagation()} />
         </div>
       )}
     </>
   );
 }
 
-// Fix #22: add Nominatim-required User-Agent header
+// ── Reverse geocode ───────────────────────────────────────
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
     );
     const data = await res.json();
     const a = data.address || {};
     const city    = a.city || a.town || a.village || a.county || a.state || '';
     const country = a.country || '';
     return city ? `${city}, ${country}` : country || data.display_name?.split(',')[0] || '';
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
-
 const STATUS_CLASS = {
-  delivered:      'delivered',
-  'in-transit':   'in-transit',
-  'out-delivery': 'out-delivery',
-  pending:        'pending',
-  exception:      'exception',
+  delivered: 'delivered', 'in-transit': 'in-transit',
+  'out-delivery': 'out-delivery', pending: 'pending', exception: 'exception',
 };
-
 const STATUS_ICON = {
-  delivered:      'fa-circle-check',
-  'in-transit':   'fa-plane',
-  'out-delivery': 'fa-truck',
-  pending:        'fa-clock',
-  exception:      'fa-triangle-exclamation',
+  delivered: 'fa-circle-check', 'in-transit': 'fa-plane',
+  'out-delivery': 'fa-truck', pending: 'fa-clock', exception: 'fa-triangle-exclamation',
 };
 
 export default function ResultCard({ result, steps }) {
@@ -76,182 +57,162 @@ export default function ResultCard({ result, steps }) {
   const [copied, setCopied]         = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [liveLocation, setLiveLocation] = useState(result.current_location);
-  const geocodeTimerRef = useRef(null);
   const lastGeocodedRef = useRef({ lat: null, lng: null });
 
   const statusCls = STATUS_CLASS[result.status] || 'pending';
   const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
   const hasMap = (result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng)
               || (result.map_lat && result.map_lng);
-
   const isMoving = (result.status === 'in-transit' || result.status === 'out-delivery')
     && result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng;
 
-  // ── Real-time location update ──────────────────────────
-  // Every 30 seconds, calculate plane's current position and reverse geocode it
+  // Parse service_tags from comma-separated string
+  const serviceTags = result.service_tags
+    ? result.service_tags.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  // ── Real-time location update ─────────────────────────
   useEffect(() => {
     if (!isMoving) return;
-
     async function updateLocation() {
       let lat, lng;
-
       if (result.pickup_time && result.delivery_time) {
         const frac = getJourneyFraction(result.pickup_time, result.delivery_time);
         if (frac === null) return;
         const pos = interpolatePosition(
           parseFloat(result.origin_lat), parseFloat(result.origin_lng),
-          parseFloat(result.dest_lat),   parseFloat(result.dest_lng),
-          frac
+          parseFloat(result.dest_lat),   parseFloat(result.dest_lng), frac
         );
-        lat = pos.lat;
-        lng = pos.lng;
+        lat = pos.lat; lng = pos.lng;
       } else {
-        // No time window — use midpoint as approximation
         lat = (parseFloat(result.origin_lat) + parseFloat(result.dest_lat)) / 2;
         lng = (parseFloat(result.origin_lng) + parseFloat(result.dest_lng)) / 2;
       }
-
-      // Only reverse geocode if position changed significantly (>0.5 degree)
-      const prev = lastGeocodedRef.current;
+      const prev  = lastGeocodedRef.current;
       const moved = !prev.lat || Math.hypot(lat - prev.lat, lng - prev.lng) > 0.5;
       if (!moved) return;
-
       lastGeocodedRef.current = { lat, lng };
       const name = await reverseGeocode(lat, lng);
       if (name) setLiveLocation(name);
     }
-
-    // Run immediately then every 30s
     updateLocation();
     const id = setInterval(updateLocation, 30000);
     return () => clearInterval(id);
   }, [isMoving, result.pickup_time, result.delivery_time,
       result.origin_lat, result.origin_lng, result.dest_lat, result.dest_lng]);
 
-// Fix #12: add .catch to clipboard writes
   function copyTracking() {
     navigator.clipboard.writeText(result.tracking_number)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(() => { /* clipboard not available */ });
+      .catch(() => {});
   }
-
   function shareLink() {
-    const url = `${window.location.origin}/?track=${encodeURIComponent(result.tracking_number)}`;
+    const url = `${window.location.origin}/track/${encodeURIComponent(result.tracking_number)}`;
     navigator.clipboard.writeText(url)
       .then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); })
-      .catch(() => { /* clipboard not available */ });
+      .catch(() => {});
   }
 
   return (
     <div className="result-card">
 
-      {/* ── CARD HEADER ── */}
-      <div className="result-card-header">
-        <div className="result-card-header-left">
-          <div className="tracking-number-label">{t.trackingNumber}</div>
-          <div className="tracking-number-row">
-            <div className="tracking-number-value">{result.tracking_number}</div>
-            <button className="btn-copy" onClick={copyTracking} title={t.copy}>
+      {/* ══ HEADER ══════════════════════════════════════ */}
+      <div className="rc-header">
+        <div className="rc-header-left">
+          <div className="rc-tracking-label">Tracking Code</div>
+          <div className="rc-tracking-number">{result.tracking_number}</div>
+
+          {/* Service tags */}
+          <div className="rc-tags">
+            <span className="rc-tag rc-tag-service">
+              <i className="fa-solid fa-box"></i> {result.service}
+            </span>
+            {serviceTags.map(tag => (
+              <span key={tag} className="rc-tag rc-tag-extra">
+                <i className="fa-solid fa-tag"></i> {tag}
+              </span>
+            ))}
+            {result.item_name && (
+              <span className="rc-tag rc-tag-item">
+                <i className="fa-solid fa-cube"></i> {result.item_name}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="rc-header-right">
+          <span className={`status-badge ${statusCls}`}>
+            <i className={`fa-solid ${STATUS_ICON[result.status] || 'fa-box'}`}></i>
+            {result.status_label}
+          </span>
+          <div className="rc-header-actions">
+            <button className="btn-copy" onClick={copyTracking} title="Copy tracking number">
               <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`}></i>
-              <span>{copied ? t.copied : t.copy}</span>
+              <span>{copied ? 'Copied!' : 'Copy'}</span>
             </button>
             <button className="btn-share" onClick={shareLink} title="Share tracking link">
               <i className={`fa-solid ${linkCopied ? 'fa-check' : 'fa-share-nodes'}`}></i>
               <span>{linkCopied ? 'Link Copied!' : 'Share'}</span>
             </button>
           </div>
-          {result.item_name && (
-            <div className="tracking-item-name">
-              <i className="fa-solid fa-tag"></i> {result.item_name}
-            </div>
-          )}
-          <div className="tracking-service-badge">
-            <i className="fa-solid fa-box"></i> {result.service}
-            {result.weight && (
-              <span className="tracking-weight">
-                <i className="fa-solid fa-weight-hanging"></i> {result.weight}
+        </div>
+      </div>
+
+      {/* ══ MAIN INFO GRID ══════════════════════════════ */}
+      <div className="rc-info-grid">
+        {(result.receiver_name || result.recipient) && (
+          <div className="rc-info-item">
+            <div className="rc-info-label">Recipient</div>
+            <div className="rc-info-value rc-highlight">{result.receiver_name || result.recipient}</div>
+          </div>
+        )}
+        <div className="rc-info-item">
+          <div className="rc-info-label">Destination</div>
+          <div className="rc-info-value rc-highlight">
+            {result.receiver_address || result.destination}
+          </div>
+        </div>
+        <div className="rc-info-item">
+          <div className="rc-info-label">
+            <i className="fa-regular fa-calendar"></i> ETA
+          </div>
+          <div className="rc-info-value">
+            {result.delivered_at
+              ? new Date(result.delivered_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              : result.estimated_delivery || '—'}
+          </div>
+        </div>
+        <div className="rc-info-item">
+          <div className="rc-info-label">
+            <i className="fa-solid fa-location-dot"></i> Current Location
+            {isMoving && (
+              <span className="live-chip">
+                <i className="fa-solid fa-circle"></i> LIVE
               </span>
             )}
           </div>
+          <div className="rc-info-value rc-highlight">{liveLocation}</div>
         </div>
-        <div className="result-card-header-right">
-          <span className={`status-badge ${statusCls}`}>
-            <i className={`fa-solid ${STATUS_ICON[result.status] || 'fa-box'}`}></i>
-            {result.status_label}
-          </span>
+        <div className="rc-info-item rc-info-item-route">
+          <div className="rc-info-label">Route</div>
+          <div className="rc-route-row">
+            <div className="rc-route-point">
+              <span className="route-point-tag origin-tag">FROM</span>
+              <span className="rc-info-value">{result.origin}</span>
+            </div>
+            <i className="fa-solid fa-arrow-right rc-route-arrow"></i>
+            <div className="rc-route-point">
+              <span className="route-point-tag dest-tag">TO</span>
+              <span className="rc-info-value">{result.destination}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── INFO BLOCKS ── */}
-      <div className="result-card-body">
-        <div className="info-block">
-          <div className="info-block-icon"><i className="fa-solid fa-location-dot"></i></div>
-          <div>
-            <div className="info-block-label">
-              {t.currentLocation}
-              {isMoving && (
-                <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--orange)', fontWeight: 700 }}>
-                  <i className="fa-solid fa-circle" style={{ fontSize: '7px', animation: 'pulse 1.2s infinite' }}></i> LIVE
-                </span>
-              )}
-            </div>
-            <div className="info-block-value">{liveLocation}</div>
-          </div>
-        </div>
-        <div className="info-block">
-          <div className="info-block-icon"><i className="fa-solid fa-route"></i></div>
-          <div>
-            <div className="info-block-label">{t.route}</div>
-            <div className="info-block-route-row">
-              <div className="info-block-route-point">
-                <span className="route-point-tag origin-tag">FROM</span>
-                <span className="info-block-value">{result.origin}</span>
-              </div>
-              <i className="fa-solid fa-arrow-right route-arrow"></i>
-              <div className="info-block-route-point">
-                <span className="route-point-tag dest-tag">TO</span>
-                <span className="info-block-value">{result.destination}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        {result.delivered_at ? (
-          <div className="info-block">
-            <div className="info-block-icon delivered"><i className="fa-solid fa-circle-check"></i></div>
-            <div>
-              <div className="info-block-label">{t.delivered}</div>
-              <div className="info-block-value">
-                {new Date(result.delivered_at).toLocaleString(undefined, {
-                  month: 'short', day: 'numeric', year: 'numeric',
-                  hour: 'numeric', minute: '2-digit', hour12: true,
-                })}
-              </div>
-              {result.recipient && (
-                <div className="info-block-sub">
-                  <i className="fa-solid fa-user" style={{ fontSize: '10px', marginRight: '4px' }}></i>
-                  {result.recipient}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="info-block">
-            <div className="info-block-icon"><i className="fa-solid fa-calendar-check"></i></div>
-            <div>
-              <div className="info-block-label">{t.estimatedDelivery}</div>
-              <div className="info-block-value">{result.estimated_delivery || '—'}</div>
-              <div className="info-block-sub">{t.subjectToChange}</div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* ══ ITEM IMAGE ══════════════════════════════════ */}
+      {result.item_image_url && <ItemImage url={result.item_image_url} />}
 
-      {/* ── ITEM IMAGE ── */}
-      {result.item_image_url && (
-        <ItemImage url={result.item_image_url} />
-      )}
-
-      {/* ── LIVE MAP ── */}
+      {/* ══ LIVE MAP ════════════════════════════════════ */}
       {hasMap && (
         <TrackingMap
           lat={result.map_lat ? parseFloat(result.map_lat) : null}
@@ -268,7 +229,89 @@ export default function ResultCard({ result, steps }) {
         />
       )}
 
-      {/* ── PROGRESS BAR ── */}
+      {/* ══ PACKAGE DETAILS ═════════════════════════════ */}
+      {(result.weight || result.package_size || result.declared_amount || result.special_note) && (
+        <div className="rc-section">
+          <div className="rc-section-title">
+            <i className="fa-solid fa-box-open"></i> Package Details
+          </div>
+          <div className="rc-pkg-grid">
+            {result.weight && (
+              <div className="rc-pkg-item">
+                <div className="rc-pkg-label"><i className="fa-solid fa-weight-hanging"></i> Weight</div>
+                <div className="rc-pkg-value">{result.weight}</div>
+              </div>
+            )}
+            {result.package_size && (
+              <div className="rc-pkg-item">
+                <div className="rc-pkg-label"><i className="fa-solid fa-ruler-combined"></i> Size</div>
+                <div className="rc-pkg-value">{result.package_size}</div>
+              </div>
+            )}
+            {result.declared_amount && (
+              <div className="rc-pkg-item">
+                <div className="rc-pkg-label"><i className="fa-solid fa-dollar-sign"></i> Amount</div>
+                <div className="rc-pkg-value">{result.declared_amount}</div>
+              </div>
+            )}
+          </div>
+          {result.special_note && (
+            <div className="rc-note">
+              <div className="rc-note-label">Note</div>
+              <div className="rc-note-text">{result.special_note}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ SENDER / RECEIVER ═══════════════════════════ */}
+      {(result.sender_name || result.receiver_name) && (
+        <div className="rc-parties-row">
+          {result.sender_name && (
+            <div className="rc-party-card">
+              <div className="rc-party-title">
+                <i className="fa-solid fa-user"></i> Sender
+              </div>
+              <div className="rc-party-name">{result.sender_name}</div>
+              {result.sender_phone && (
+                <div className="rc-party-detail">
+                  <i className="fa-solid fa-phone"></i> {result.sender_phone}
+                </div>
+              )}
+              {result.sender_email && (
+                <div className="rc-party-detail">
+                  <i className="fa-solid fa-envelope"></i> {result.sender_email}
+                </div>
+              )}
+            </div>
+          )}
+          {result.receiver_name && (
+            <div className="rc-party-card">
+              <div className="rc-party-title">
+                <i className="fa-solid fa-user-check"></i> Receiver
+              </div>
+              <div className="rc-party-name">{result.receiver_name}</div>
+              {result.receiver_phone && (
+                <div className="rc-party-detail">
+                  <i className="fa-solid fa-phone"></i> {result.receiver_phone}
+                </div>
+              )}
+              {result.receiver_email && (
+                <div className="rc-party-detail">
+                  <i className="fa-solid fa-envelope"></i> {result.receiver_email}
+                </div>
+              )}
+              {result.receiver_address && (
+                <div className="rc-party-detail">
+                  <i className="fa-solid fa-location-dot"></i> {result.receiver_address}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ SHIPMENT PROGRESS ═══════════════════════════ */}
       <div className="progress-section">
         <h4>{t.shipmentProgress}</h4>
         <div className="progress-track">
@@ -285,7 +328,7 @@ export default function ResultCard({ result, steps }) {
         </div>
       </div>
 
-      {/* ── TIMELINE ── */}
+      {/* ══ DELIVERY TIMELINE ═══════════════════════════ */}
       <div className="timeline-section">
         <h4>{t.trackingHistory}</h4>
         <div className="timeline">
@@ -293,7 +336,6 @@ export default function ResultCard({ result, steps }) {
             <p style={{ color: 'var(--gray-400)', fontSize: '13px' }}>{t.noEvents}</p>
           ) : (
             result.timeline.map((evt, i) => (
-              // Fix #16: use evt.id as stable key (now returned by backend)
               <div key={evt.id || `${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
                 <div className="timeline-dot"></div>
                 <div className="timeline-date">{evt.date}</div>

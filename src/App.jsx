@@ -6,10 +6,14 @@ import Footer from './components/Footer';
 import AdminDashboard from './pages/AdminDashboard';
 import SignInModal from './components/SignInModal';
 import { fetchTracking } from './api/tracking';
-import { getSession, signOut } from './api/auth';
+import { getSession, onAuthChange } from './api/auth';
 
-// Admin email only used for session check — not exposed in UI
-const ADMIN_EMAIL = 'nnanwubagabriel@gmail.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+// Fire-and-forget health ping to pre-warm the Render free-tier server
+function pingServer() {
+  fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {/* silent */});
+}
 
 export default function App() {
   const [results, setResults]           = useState([]);
@@ -24,18 +28,34 @@ export default function App() {
   );
 
   useEffect(() => {
+    // Pre-warm the Render backend immediately on page load
+    pingServer();
+
+    // Restore session on mount
     getSession().then(session => {
-      if (session && session.user.email === ADMIN_EMAIL) {
-        if (!backedToSite) setAdminSession(session);
-      }
+      if (session && !backedToSite) setAdminSession(session);
       setSessionChecked(true);
     }).catch(() => setSessionChecked(true));
 
-    // Auto-track if ?track=XXXX is in the URL
+    // Subscribe to auth changes (token refresh, expiry, sign-out)
+    const unsubscribe = onAuthChange(session => {
+      if (!session) {
+        // Signed out or token expired — clear admin state
+        setAdminSession(null);
+        setBackedToSite(false);
+        sessionStorage.removeItem('plt-backed');
+      } else {
+        // Token refreshed — update session silently
+        setAdminSession(prev => prev ? session : prev);
+      }
+    });
+
+    // Auto-track if /track/XXXX or ?track=XXXX is in the URL
+    const pathMatch = window.location.pathname.match(/^\/track\/([A-Z0-9\-]+)$/i);
     const params     = new URLSearchParams(window.location.search);
-    const trackParam = params.get('track');
+    const trackParam = pathMatch ? pathMatch[1] : params.get('track');
     if (trackParam) {
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, '', '/');
       setHasSearched(true);
       setLoading(true);
       fetchTracking(trackParam)
@@ -43,6 +63,8 @@ export default function App() {
         .catch(err => setError(err.message || 'Something went wrong.'))
         .finally(() => setLoading(false));
     }
+
+    return unsubscribe;
   }, []);
 
   async function handleTrack(numbersRaw) {
@@ -73,9 +95,8 @@ export default function App() {
     setShowSignIn(false);
   }
 
-  // Fix #26: wrap signOut in try/catch so logout always completes
   async function handleSignOut() {
-    try { await signOut(); } catch (_) { /* ignore supabase errors */ }
+    try { await import('./api/auth').then(m => m.signOut()); } catch (_) {}
     setAdminSession(null);
     setBackedToSite(false);
     sessionStorage.removeItem('plt-backed');
@@ -107,9 +128,8 @@ export default function App() {
     );
   }
 
-  // Fix #2: only show admin email in header when a real verified session exists
-  // backedToSite = session exists but user chose to stay on public site
-  const headerUser = backedToSite ? { email: ADMIN_EMAIL } : null;
+  // backedToSite: session exists but user chose to browse the public site
+  const headerUser = backedToSite ? { email: '···' } : null;
 
   return (
     <>

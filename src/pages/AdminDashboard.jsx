@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { signOut } from '../api/auth';
+import { signOut, supabase } from '../api/auth';
 import {
   getShipments, deleteShipment, updateLocation,
   addEvent, deleteEvent, createShipment, updateShipment, getShipment,
@@ -29,6 +29,10 @@ const EMPTY_FORM = {
   origin_lat: '', origin_lng: '',
   dest_lat: '',  dest_lng: '',
   pickup_time: '', delivery_time: '',
+  // Delivio fields
+  sender_name: '', sender_phone: '', sender_email: '',
+  receiver_name: '', receiver_phone: '', receiver_email: '', receiver_address: '',
+  package_size: '', declared_amount: '', special_note: '', service_tags: '',
   _imageFile: null, _imageUrl: null,
 };
 
@@ -59,6 +63,22 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [geoResults, setGeoResults]           = useState({ origin: [], dest: [] });
   const [geoConfirmed, setGeoConfirmed]       = useState({ origin: '', dest: '' });
   const geocodeTimers                         = useRef({});
+  // Live token ref — updated by Supabase auth state changes so long sessions don't 401
+  const tokenRef = useRef(tokenRef.current);
+  useEffect(() => { tokenRef.current = session?.access_token; }, [session]);
+
+  // Keep token fresh: subscribe to Supabase auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (newSession?.access_token) {
+        tokenRef.current = newSession.access_token;
+      } else {
+        // Session expired — force logout
+        onLogout();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── AUTO-GEOCODE with dropdown picker ────────────────
   function scheduleGeocode(field, value) {
@@ -76,7 +96,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -123,7 +143,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   async function loadShipments() {
     setLoading(true);
     try {
-      const data = await getShipments(token);
+      const data = await getShipments(tokenRef.current);
       setShipments(data.shipments);
     } catch (e) { toast_show(e.message, 'error'); }
     finally { setLoading(false); }
@@ -131,7 +151,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
 
   async function loadExpanded(id) {
     try {
-      const data = await getShipment(id, token);
+      const data = await getShipment(id, tokenRef.current);
       setExpandedData(data);
       setLocationForm({
         map_lat: data.shipment.map_lat || '',
@@ -168,11 +188,11 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       // Fix #28: strip client-only temp fields before sending to backend
       const { _imageFile, _imageUrl, ...formData } = form;
       if (editingShipment) {
-        await updateShipment(editingShipment.id, formData, token);
+        await updateShipment(editingShipment.id, formData, tokenRef.current);
         shipmentId = editingShipment.id;
         toast_show('Shipment updated');
       } else {
-        const result = await createShipment(formData, token);
+        const result = await createShipment(formData, tokenRef.current);
         shipmentId = result.shipment.id;
         toast_show('Shipment created');
       }
@@ -186,7 +206,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
             reader.onerror = () => reject(new Error('Failed to read file'));
             reader.readAsDataURL(form._imageFile);
           });
-          await uploadImage(shipmentId, { base64, mimeType: form._imageFile.type }, token);
+          await uploadImage(shipmentId, { base64, mimeType: form._imageFile.type }, tokenRef.current);
           toast_show('Image uploaded successfully');
         } catch (imgErr) {
           toast_show(`Shipment saved but image failed: ${imgErr.message}`, 'error');
@@ -210,7 +230,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   async function handleDelete(id) {
     if (!window.confirm('Delete this shipment? This cannot be undone.')) return;
     try {
-      await deleteShipment(id, token);
+      await deleteShipment(id, tokenRef.current);
       toast_show('Shipment deleted');
       if (expandedId === id) { setExpandedId(null); setExpandedData(null); }
       loadShipments();
@@ -242,6 +262,18 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       dest_lng:        s.dest_lng   || '',
       pickup_time:     s.pickup_time   ? s.pickup_time.slice(0, 16)   : '',
       delivery_time:   s.delivery_time ? s.delivery_time.slice(0, 16) : '',
+      // Delivio fields
+      sender_name:      s.sender_name      || '',
+      sender_phone:     s.sender_phone     || '',
+      sender_email:     s.sender_email     || '',
+      receiver_name:    s.receiver_name    || '',
+      receiver_phone:   s.receiver_phone   || '',
+      receiver_email:   s.receiver_email   || '',
+      receiver_address: s.receiver_address || '',
+      package_size:     s.package_size     || '',
+      declared_amount:  s.declared_amount  || '',
+      special_note:     s.special_note     || '',
+      service_tags:     s.service_tags     || '',
     });
     setEditingShipment(s);
     setView('form');
@@ -263,7 +295,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateLocation(expandedId, locationForm, token);
+      await updateLocation(expandedId, locationForm, tokenRef.current);
       toast_show('Live location updated');
       loadExpanded(expandedId);
       loadShipments();
@@ -279,7 +311,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       await addEvent(expandedId, {
         ...eventForm,
         event_time: new Date(eventForm.event_time).toISOString(),
-      }, token);
+      }, tokenRef.current);
       toast_show('Event added');
       setEventForm(makeEmptyEvent());
       loadExpanded(expandedId);
@@ -291,7 +323,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   async function handleDeleteEvent(id) {
     if (!window.confirm('Delete this event?')) return;
     try {
-      await deleteEvent(id, token);
+      await deleteEvent(id, tokenRef.current);
       toast_show('Event deleted');
       loadExpanded(expandedId);
     } catch (e) { toast_show(e.message, 'error'); }
@@ -330,7 +362,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(file);
       });
-      await uploadImage(expandedId, { base64, mimeType: file.type }, token);
+      await uploadImage(expandedId, { base64, mimeType: file.type }, tokenRef.current);
       toast_show('Image uploaded successfully');
       loadExpanded(expandedId);
       loadShipments();
@@ -344,7 +376,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   async function handleImageDelete() {
     if (!window.confirm('Remove this image?')) return;
     try {
-      await deleteImage(expandedId, token);
+      await deleteImage(expandedId, tokenRef.current);
       toast_show('Image removed');
       loadExpanded(expandedId);
       loadShipments();
@@ -919,10 +951,112 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                 )}
               </div>
 
-              {/* ── SECTION 5: Map ── */}
+              {/* ── SECTION 5: Sender & Receiver ── */}
               <div className="form-section">
                 <div className="form-section-title">
                   <span className="form-step-num">5</span>
+                  Sender &amp; Receiver
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Sender Name <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. Kim Seo-Jeong"
+                      value={form.sender_name}
+                      onChange={e => setForm(f => ({ ...f, sender_name: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Sender Phone <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. +1-555-000-1234"
+                      value={form.sender_phone}
+                      onChange={e => setForm(f => ({ ...f, sender_phone: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Sender Email <span className="optional">(optional)</span></label>
+                    <input type="email" placeholder="e.g. sender@email.com"
+                      value={form.sender_email}
+                      onChange={e => setForm(f => ({ ...f, sender_email: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="form-divider"></div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Receiver Name <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. GUOYONGQUAN"
+                      value={form.receiver_name}
+                      onChange={e => setForm(f => ({ ...f, receiver_name: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Receiver Phone <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. +82-10-7334-5188"
+                      value={form.receiver_phone}
+                      onChange={e => setForm(f => ({ ...f, receiver_phone: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Receiver Email <span className="optional">(optional)</span></label>
+                    <input type="email" placeholder="e.g. receiver@email.com"
+                      value={form.receiver_email}
+                      onChange={e => setForm(f => ({ ...f, receiver_email: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Receiver Full Address <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. Room 202, 85 Hanggaul-ro, Ansan-si"
+                      value={form.receiver_address}
+                      onChange={e => setForm(f => ({ ...f, receiver_address: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SECTION 6: Extra Package Info ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">6</span>
+                  Extra Package Info
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Package Size <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. Medium, Large, 30x20x15cm"
+                      value={form.package_size}
+                      onChange={e => setForm(f => ({ ...f, package_size: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Declared Amount <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. $30,000"
+                      value={form.declared_amount}
+                      onChange={e => setForm(f => ({ ...f, declared_amount: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Service Tags <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. Air Freight, Express (comma-separated)"
+                      value={form.service_tags}
+                      onChange={e => setForm(f => ({ ...f, service_tags: e.target.value }))} />
+                    <p className="field-hint"><i className="fa-solid fa-circle-info"></i> Tags appear as pills on the tracking page (e.g. "Air Freight, Express")</p>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label>Special Note <span className="optional">(optional)</span></label>
+                    <textarea placeholder="e.g. Handle with care, Fragile contents"
+                      rows={3}
+                      style={{ width: '100%', resize: 'vertical', fontFamily: 'Inter, sans-serif', fontSize: '14px', padding: '10px 12px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none' }}
+                      value={form.special_note}
+                      onChange={e => setForm(f => ({ ...f, special_note: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SECTION 7: Live Map ── */}
+              <div className="form-section">
+                <div className="form-section-title">
+                  <span className="form-step-num">7</span>
                   Live Map
                 </div>
                 <p className="section-desc">
@@ -1000,7 +1134,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               {/* ── SECTION 6: Package Image ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">6</span>
+                  <span className="form-step-num">8</span>
                   Package Image <span className="optional">(optional)</span>
                 </div>
                 <p className="section-desc">
