@@ -6,7 +6,7 @@ import Footer from './components/Footer';
 import AdminDashboard from './pages/AdminDashboard';
 import SignInModal from './components/SignInModal';
 import { fetchTracking } from './api/tracking';
-import { getSession, onAuthChange } from './api/auth';
+import { getSession, onAuthChange, signOut } from './api/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -96,7 +96,7 @@ export default function App() {
   }
 
   async function handleSignOut() {
-    try { await import('./api/auth').then(m => m.signOut()); } catch (_) {}
+    try { await signOut(); } catch (_) {}
     setAdminSession(null);
     setBackedToSite(false);
     sessionStorage.removeItem('plt-backed');

@@ -64,7 +64,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [geoConfirmed, setGeoConfirmed]       = useState({ origin: '', dest: '' });
   const geocodeTimers                         = useRef({});
   // Live token ref — updated by Supabase auth state changes so long sessions don't 401
-  const tokenRef = useRef(tokenRef.current);
+  const tokenRef = useRef(session?.access_token);
   useEffect(() => { tokenRef.current = session?.access_token; }, [session]);
 
   // Keep token fresh: subscribe to Supabase auth state changes
