@@ -311,43 +311,75 @@ export default function ResultCard({ result, steps }) {
         </div>
       )}
 
-      {/* ══ SHIPMENT PROGRESS ═══════════════════════════ */}
-      <div className="progress-section">
-        <h4>{t.shipmentProgress}</h4>
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${pct}%` }}></div>
+      {/* ══ DELIVERY TIMELINE — Delivio vertical stepper ═══ */}
+      <div className="rc-section">
+        <div className="rc-section-title">
+          <i className="fa-solid fa-timeline"></i> Delivery Timeline
+        </div>
+        <div className="dv-stepper">
           {steps.map((step, i) => {
-            const cls = i < result.progress_step ? 'done' : i === result.progress_step ? 'current' : '';
+            const isDone    = i < result.progress_step;
+            const isCurrent = i === result.progress_step;
+            const isPending = i > result.progress_step;
+
+            // Collect timeline events that belong to this step by matching step label keywords
+            const stepEvents = result.timeline.filter(evt => {
+              const s = evt.status?.toLowerCase() || '';
+              const l = step.label.toLowerCase();
+              if (l.includes('label'))    return s.includes('label') || s.includes('creat');
+              if (l.includes('picked'))   return s.includes('pick');
+              if (l.includes('transit'))  return s.includes('transit') || s.includes('hub') || s.includes('custom') || s.includes('depart') || s.includes('arriv');
+              if (l.includes('delivery')) return s.includes('deliver') || s.includes('vehicle') || s.includes('way');
+              if (l.includes('delivered')) return s.includes('delivered');
+              return false;
+            });
+
             return (
-              <div key={step.label} className={`step ${cls}`}>
-                <div className="step-dot"><i className={`fa-solid ${step.icon}`}></i></div>
-                <div className="step-label">{step.label}</div>
+              <div key={step.label} className={`dv-step ${isDone ? 'dv-done' : isCurrent ? 'dv-current' : 'dv-pending'}`}>
+                {/* Connector line */}
+                {i < steps.length - 1 && <div className="dv-line"></div>}
+
+                {/* Circle */}
+                <div className="dv-circle">
+                  {(isDone || isCurrent) && <i className="fa-solid fa-check"></i>}
+                </div>
+
+                {/* Content */}
+                <div className="dv-content">
+                  <div className="dv-step-label">{step.label}</div>
+                  {stepEvents.map((evt, ei) => (
+                    <div key={evt.id || ei} className="dv-event">
+                      <span className={`dv-event-pill ${isDone || isCurrent ? 'dv-pill-active' : 'dv-pill-dim'}`}>
+                        {evt.status}
+                      </span>
+                      <div className="dv-event-date">{evt.date}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* ══ DELIVERY TIMELINE ═══════════════════════════ */}
-      <div className="timeline-section">
-        <h4>{t.trackingHistory}</h4>
-        <div className="timeline">
-          {result.timeline.length === 0 ? (
-            <p style={{ color: 'var(--gray-400)', fontSize: '13px' }}>{t.noEvents}</p>
-          ) : (
-            result.timeline.map((evt, i) => (
-              <div key={evt.id || `${evt.date}-${i}`} className={`timeline-item ${evt.latest ? 'latest' : ''}`}>
-                <div className="timeline-dot"></div>
-                <div className="timeline-date">{evt.date}</div>
-                <div className="timeline-status">{evt.status}</div>
-                <div className="timeline-location">
-                  <i className="fa-solid fa-location-dot" style={{ color: '#bbb', fontSize: '11px', marginRight: '4px' }}></i>
-                  {evt.location}
+        {/* Show any events that didn't match a step */}
+        {(() => {
+          const allStepLabels = ['label', 'creat', 'pick', 'transit', 'hub', 'custom', 'depart', 'arriv', 'deliver', 'vehicle', 'way'];
+          const unmatched = result.timeline.filter(evt => {
+            const s = evt.status?.toLowerCase() || '';
+            return !allStepLabels.some(kw => s.includes(kw));
+          });
+          if (!unmatched.length) return null;
+          return (
+            <div style={{ marginTop: '12px', paddingLeft: '44px' }}>
+              {unmatched.map((evt, i) => (
+                <div key={evt.id || i} className="dv-event">
+                  <span className="dv-event-pill dv-pill-active">{evt.status}</span>
+                  <div className="dv-event-date">{evt.date} — {evt.location}</div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
     </div>
