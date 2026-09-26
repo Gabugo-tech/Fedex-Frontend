@@ -669,9 +669,9 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                         <span className={`status-badge ${s.status}`}>
                           <i className={`fa-solid ${s.status_icon}`}></i> {s.status_label}
                         </span>
-                        <span className={`map-pin-indicator ${s.origin_lat ? 'set' : ''}`}>
+                        <span className={`map-pin-indicator ${s.map_lat ? 'set' : ''}`}>
                           <i className="fa-solid fa-map"></i>
-                          {s.origin_lat ? ' Map set' : ' No map'}
+                          {s.map_lat ? ' Map set' : ' No map'}
                         </span>
                       </div>
                       <div className="shipment-row-actions">
@@ -936,6 +936,20 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                     onChange={e => setForm(f => ({ ...f, item_name: e.target.value }))} />
                   <p className="field-hint">This is shown to the customer on the tracking page.</p>
                 </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Origin / Pickup City *</label>
+                    <input type="text" placeholder="e.g. Los Angeles, CA"
+                      value={form.origin} required
+                      onChange={e => setForm(f => ({ ...f, origin: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Destination *</label>
+                    <input type="text" placeholder="e.g. Seoul, South Korea"
+                      value={form.destination} required
+                      onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} />
+                  </div>
+                </div>
               </div>
 
               {/* ── SECTION 2: Status ── */}
@@ -956,107 +970,10 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                 </div>
               </div>
 
-              {/* ── SECTION 3: Route ── */}
-              <div className="form-section">
-                <div className="form-section-title">
-                  <span className="form-step-num">3</span>
-                  Route
-                </div>
-                <p className="section-desc">
-                  Type the city or address — coordinates are looked up automatically.
-                </p>
-                <div className="form-row">
-                  <div className="form-group" style={{ position: 'relative' }}>
-                    <label>
-                      Pickup City / Origin *
-                      {geoStatus.origin === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching…</span>}
-                      {geoStatus.origin === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Confirmed</span>}
-                      {geoStatus.origin === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
-                      {geoStatus.origin === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
-                      {geoStatus.origin === 'choose'  && <span className="geo-status loading"><i className="fa-solid fa-hand-pointer"></i> Select a result below</span>}
-                    </label>
-                    <input type="text" placeholder="e.g. Los Angeles, CA"
-                      value={form.origin} required
-                      autoComplete="off"
-                      onChange={e => {
-                        setForm(f => ({ ...f, origin: e.target.value, origin_lat: '', origin_lng: '' }));
-                        setGeoConfirmed(c => ({ ...c, origin: '' }));
-                        setGeoStatus(s => ({ ...s, origin: '' }));
-                        scheduleGeocode('origin', e.target.value);
-                      }} />
-                    {/* Fix #36: keyboard navigation on geo-dropdown */}
-                    {geoResults.origin.length > 0 && (
-                      <ul className="geo-dropdown" role="listbox" aria-label="Location suggestions">
-                        {geoResults.origin.map((r, i) => (
-                          <li key={r.place_id}
-                            role="option"
-                            tabIndex={0}
-                            onClick={() => handleGeoSelect('origin', r)}
-                            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleGeoSelect('origin', r)}>
-                            <i className="fa-solid fa-location-dot"></i>
-                            <span>{r.display_name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {geoStatus.origin === 'ok' && geoConfirmed.origin && (
-                      <p className="coords-preview">
-                        <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
-                        &nbsp;{geoConfirmed.origin.split(',').slice(0, 3).join(',')}
-                        &nbsp;· {parseFloat(form.origin_lat).toFixed(4)}, {parseFloat(form.origin_lng).toFixed(4)}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="form-group" style={{ position: 'relative' }}>
-                    <label>
-                      Delivery Address / Destination *
-                      {geoStatus.dest === 'loading' && <span className="geo-status loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching…</span>}
-                      {geoStatus.dest === 'ok'      && <span className="geo-status ok"><i className="fa-solid fa-check-circle"></i> Confirmed</span>}
-                      {geoStatus.dest === 'notfound'&& <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Not found</span>}
-                      {geoStatus.dest === 'error'   && <span className="geo-status error"><i className="fa-solid fa-triangle-exclamation"></i> Lookup failed</span>}
-                      {geoStatus.dest === 'choose'  && <span className="geo-status loading"><i className="fa-solid fa-hand-pointer"></i> Select a result below</span>}
-                    </label>
-                    <input type="text" placeholder="e.g. New York, NY 10001"
-                      value={form.destination} required
-                      autoComplete="off"
-                      onChange={e => {
-                        setForm(f => ({ ...f, destination: e.target.value, dest_lat: '', dest_lng: '' }));
-                        setGeoConfirmed(c => ({ ...c, dest: '' }));
-                        setGeoStatus(s => ({ ...s, dest: '' }));
-                        scheduleGeocode('dest', e.target.value);
-                      }} />
-                    {/* Fix #36: keyboard navigation on dest geo-dropdown */}
-                    {geoResults.dest.length > 0 && (
-                      <ul className="geo-dropdown" role="listbox" aria-label="Location suggestions">
-                        {geoResults.dest.map(r => (
-                          <li key={r.place_id}
-                            role="option"
-                            tabIndex={0}
-                            onClick={() => handleGeoSelect('dest', r)}
-                            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleGeoSelect('dest', r)}>
-                            <i className="fa-solid fa-location-dot"></i>
-                            <span>{r.display_name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {geoStatus.dest === 'ok' && geoConfirmed.dest && (
-                      <p className="coords-preview">
-                        <i className="fa-solid fa-check-circle" style={{ color: 'var(--green)' }}></i>
-                        &nbsp;{geoConfirmed.dest.split(',').slice(0, 3).join(',')}
-                        &nbsp;· {parseFloat(form.dest_lat).toFixed(4)}, {parseFloat(form.dest_lng).toFixed(4)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* ── SECTION 4: Package Details ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">4</span>
-                  Package Details
+                  <span className="form-step-num">3</span>`n                  Package Details
                 </div>
                 <div className="form-row">
                   <div className="form-group">
@@ -1114,7 +1031,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               {/* ── SECTION 5: Sender & Receiver ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">5</span>
+                  <span className="form-step-num">4</span>
                   Sender &amp; Receiver
                 </div>
                 <div className="form-row">
@@ -1175,7 +1092,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               {/* ── SECTION 6: Extra Package Info ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">6</span>
+                  <span className="form-step-num">5</span>
                   Extra Package Info
                 </div>
                 <div className="form-row">
@@ -1216,7 +1133,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               {/* ── SECTION 7: Live Map ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">7</span>
+                  <span className="form-step-num">6</span>
                   Live Map — Current Location
                 </div>
                 <p className="section-desc">
@@ -1237,7 +1154,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
               {/* ── SECTION 6: Package Image ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">8</span>
+                  <span className="form-step-num">7</span>
                   Package Image <span className="optional">(optional)</span>
                 </div>
                 <p className="section-desc">
@@ -1351,3 +1268,4 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     </div>
   );
 }
+
