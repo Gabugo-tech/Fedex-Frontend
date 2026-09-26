@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import TrackingMap from './TrackingMap';
 import { useLang } from '../i18n/LanguageContext';
-import { getJourneyFraction, interpolatePosition } from '../utils/mapMath';
 
 // ── Lightbox ──────────────────────────────────────────────
 function ItemImage({ url }) {
@@ -28,21 +27,6 @@ function ItemImage({ url }) {
   );
 }
 
-// ── Reverse geocode ───────────────────────────────────────
-async function reverseGeocode(lat, lng) {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
-    );
-    const data = await res.json();
-    const a = data.address || {};
-    const city    = a.city || a.town || a.village || a.county || a.state || '';
-    const country = a.country || '';
-    return city ? `${city}, ${country}` : country || data.display_name?.split(',')[0] || '';
-  } catch { return null; }
-}
-
 const STATUS_CLASS = {
   delivered: 'delivered', 'in-transit': 'in-transit',
   'out-delivery': 'out-delivery', pending: 'pending', exception: 'exception',
@@ -56,48 +40,15 @@ export default function ResultCard({ result, steps }) {
   const { t } = useLang();
   const [copied, setCopied]         = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [liveLocation, setLiveLocation] = useState(result.current_location);
-  const lastGeocodedRef = useRef({ lat: null, lng: null });
 
-  const statusCls = STATUS_CLASS[result.status] || 'pending';
-  const pct = Math.min(100, (result.progress_step / (steps.length - 1)) * 100);
-  const hasMap = !!(result.map_lat && result.map_lng);
-  const isMoving = false; // map shows static pin only
+  const statusCls  = STATUS_CLASS[result.status] || 'pending';
+  const hasMap     = !!(result.map_lat && result.map_lng);
+  const timeline   = result.timeline || []; // null-safe
 
   // Parse service_tags from comma-separated string
   const serviceTags = result.service_tags
     ? result.service_tags.split(',').map(s => s.trim()).filter(Boolean)
     : [];
-
-  // ── Real-time location update ─────────────────────────
-  useEffect(() => {
-    if (!isMoving) return;
-    async function updateLocation() {
-      let lat, lng;
-      if (result.pickup_time && result.delivery_time) {
-        const frac = getJourneyFraction(result.pickup_time, result.delivery_time);
-        if (frac === null) return;
-        const pos = interpolatePosition(
-          parseFloat(result.origin_lat), parseFloat(result.origin_lng),
-          parseFloat(result.dest_lat),   parseFloat(result.dest_lng), frac
-        );
-        lat = pos.lat; lng = pos.lng;
-      } else {
-        lat = (parseFloat(result.origin_lat) + parseFloat(result.dest_lat)) / 2;
-        lng = (parseFloat(result.origin_lng) + parseFloat(result.dest_lng)) / 2;
-      }
-      const prev  = lastGeocodedRef.current;
-      const moved = !prev.lat || Math.hypot(lat - prev.lat, lng - prev.lng) > 0.5;
-      if (!moved) return;
-      lastGeocodedRef.current = { lat, lng };
-      const name = await reverseGeocode(lat, lng);
-      if (name) setLiveLocation(name);
-    }
-    updateLocation();
-    const id = setInterval(updateLocation, 30000);
-    return () => clearInterval(id);
-  }, [isMoving, result.pickup_time, result.delivery_time,
-      result.origin_lat, result.origin_lng, result.dest_lat, result.dest_lng]);
 
   function copyTracking() {
     navigator.clipboard.writeText(result.tracking_number)
@@ -119,8 +70,6 @@ export default function ResultCard({ result, steps }) {
         <div className="rc-header-left">
           <div className="rc-tracking-label">Tracking Code</div>
           <div className="rc-tracking-number">{result.tracking_number}</div>
-
-          {/* Service tags */}
           <div className="rc-tags">
             <span className="rc-tag rc-tag-service">
               <i className="fa-solid fa-box"></i> {result.service}
@@ -161,7 +110,9 @@ export default function ResultCard({ result, steps }) {
         {(result.receiver_name || result.recipient) && (
           <div className="rc-info-item">
             <div className="rc-info-label">Recipient</div>
-            <div className="rc-info-value rc-highlight">{result.receiver_name || result.recipient}</div>
+            <div className="rc-info-value rc-highlight">
+              {result.receiver_name || result.recipient}
+            </div>
           </div>
         )}
         <div className="rc-info-item">
@@ -183,13 +134,8 @@ export default function ResultCard({ result, steps }) {
         <div className="rc-info-item">
           <div className="rc-info-label">
             <i className="fa-solid fa-location-dot"></i> Current Location
-            {isMoving && (
-              <span className="live-chip">
-                <i className="fa-solid fa-circle"></i> LIVE
-              </span>
-            )}
           </div>
-          <div className="rc-info-value rc-highlight">{liveLocation}</div>
+          <div className="rc-info-value rc-highlight">{result.current_location}</div>
         </div>
         <div className="rc-info-item rc-info-item-route">
           <div className="rc-info-label">Route</div>
@@ -213,9 +159,9 @@ export default function ResultCard({ result, steps }) {
       {/* ══ LIVE MAP ════════════════════════════════════ */}
       {hasMap && (
         <TrackingMap
-          lat={result.map_lat ? parseFloat(result.map_lat) : null}
-          lng={result.map_lng ? parseFloat(result.map_lng) : null}
-          label={liveLocation}
+          lat={parseFloat(result.map_lat)}
+          lng={parseFloat(result.map_lng)}
+          label={result.current_location}
           status={result.status}
         />
       )}
@@ -302,7 +248,7 @@ export default function ResultCard({ result, steps }) {
         </div>
       )}
 
-      {/* ══ DELIVERY TIMELINE — Delivio vertical stepper ═══ */}
+      {/* ══ DELIVERY TIMELINE ═══════════════════════════ */}
       <div className="rc-section">
         <div className="rc-section-title">
           <i className="fa-solid fa-timeline"></i> Delivery Timeline
@@ -311,31 +257,25 @@ export default function ResultCard({ result, steps }) {
           {steps.map((step, i) => {
             const isDone    = i < result.progress_step;
             const isCurrent = i === result.progress_step;
-            const isPending = i > result.progress_step;
 
-            // Collect timeline events that belong to this step by matching step label keywords
-            const stepEvents = result.timeline.filter(evt => {
+            // Match events to steps — fix: prevent "Delivered" events bleeding into "Out for Delivery"
+            const stepEvents = timeline.filter(evt => {
               const s = evt.status?.toLowerCase() || '';
               const l = step.label.toLowerCase();
-              if (l.includes('label'))    return s.includes('label') || s.includes('creat');
-              if (l.includes('picked'))   return s.includes('pick');
-              if (l.includes('transit'))  return s.includes('transit') || s.includes('hub') || s.includes('custom') || s.includes('depart') || s.includes('arriv');
-              if (l.includes('delivery')) return s.includes('deliver') || s.includes('vehicle') || s.includes('way');
-              if (l.includes('delivered')) return s.includes('delivered');
+              if (l.includes('label'))     return s.includes('label') || s.includes('creat');
+              if (l.includes('picked'))    return s.includes('pick');
+              if (l.includes('transit'))   return s.includes('transit') || s.includes('hub') || s.includes('custom') || s.includes('depart') || s.includes('arriv');
+              if (l === 'delivered')       return s.startsWith('delivered') || s === 'delivered';
+              if (l.includes('delivery'))  return (s.includes('deliver') || s.includes('vehicle') || s.includes('way')) && !s.startsWith('delivered');
               return false;
             });
 
             return (
               <div key={step.label} className={`dv-step ${isDone ? 'dv-done' : isCurrent ? 'dv-current' : 'dv-pending'}`}>
-                {/* Connector line */}
                 {i < steps.length - 1 && <div className="dv-line"></div>}
-
-                {/* Circle */}
                 <div className="dv-circle">
                   {(isDone || isCurrent) && <i className="fa-solid fa-check"></i>}
                 </div>
-
-                {/* Content */}
                 <div className="dv-content">
                   <div className="dv-step-label">{step.label}</div>
                   {stepEvents.map((evt, ei) => (
@@ -352,12 +292,12 @@ export default function ResultCard({ result, steps }) {
           })}
         </div>
 
-        {/* Show any events that didn't match a step */}
+        {/* Unmatched events fallback */}
         {(() => {
-          const allStepLabels = ['label', 'creat', 'pick', 'transit', 'hub', 'custom', 'depart', 'arriv', 'deliver', 'vehicle', 'way'];
-          const unmatched = result.timeline.filter(evt => {
+          const matched = ['label', 'creat', 'pick', 'transit', 'hub', 'custom', 'depart', 'arriv', 'deliver', 'vehicle', 'way'];
+          const unmatched = timeline.filter(evt => {
             const s = evt.status?.toLowerCase() || '';
-            return !allStepLabels.some(kw => s.includes(kw));
+            return !matched.some(kw => s.includes(kw));
           });
           if (!unmatched.length) return null;
           return (
@@ -371,6 +311,12 @@ export default function ResultCard({ result, steps }) {
             </div>
           );
         })()}
+
+        {timeline.length === 0 && (
+          <p style={{ color: 'var(--gray-400)', fontSize: '13px', paddingLeft: '44px' }}>
+            {t.noEvents}
+          </p>
+        )}
       </div>
 
     </div>

@@ -24,6 +24,13 @@ function CurrentLocationPicker({ value, lat, lng, onChange }) {
     mountedRef.current = true;
     // Init map
     const loadL = () => new Promise((resolve, reject) => {
+      if (!document.getElementById('leaflet-css')) {
+        const link = Object.assign(document.createElement('link'), {
+          id: 'leaflet-css', rel: 'stylesheet',
+          href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+        });
+        document.head.appendChild(link);
+      }
       if (window.L) return resolve();
       const existing = document.getElementById('leaflet-js');
       if (existing) {
@@ -231,7 +238,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [onLogout]);
 
   // ── AUTO-GEOCODE with dropdown picker ────────────────
   function scheduleGeocode(field, value) {

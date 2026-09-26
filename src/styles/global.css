@@ -177,6 +177,10 @@ a:hover { color: var(--orange); }
 
 
 /* ===== ERROR BANNER ===== */
+.error-hint {
+  color: var(--red); font-size: 13px; font-weight: 600;
+  margin-top: 10px; display: flex; align-items: center; gap: 6px;
+}
 .error-banner {
   background: #fde8eb; color: var(--red); border: 1px solid #f5c6cb;
   border-radius: 6px; padding: 12px 16px; margin-top: 16px;

@@ -11,7 +11,7 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
       <div className="top-bar">
         <div className="container top-bar-inner">
           <div className="top-links">
-            <a href="#"><i className="fa-solid fa-globe"></i> United States</a>
+            <a href="#" onClick={e => e.preventDefault()}><i className="fa-solid fa-globe"></i> United States</a>
             {/* Language Switcher */}
             <div className="lang-switcher">
               {Object.entries(LANGUAGES).map(([code, info]) => (
@@ -46,7 +46,7 @@ export default function Header({ user, onSignInClick, onSignOut, onGoToDashboard
                 <i className="fa-regular fa-user"></i> {t.signIn}
               </button>
             )}
-            <a href="#"><i className="fa-solid fa-headset"></i> {t.support}</a>
+            <a href="mailto:support@pulstrack.com"><i className="fa-solid fa-headset"></i> {t.support}</a>
           </div>
         </div>
       </div>
