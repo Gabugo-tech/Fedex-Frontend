@@ -321,7 +321,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     } catch (e) { toast_show(e.message, 'error'); }
   }
 
-  // Fix #35: error toasts persist longer (8s), success toasts dismiss at 3.5s
   function toast_show(msg, type = 'success') {
     setToast({ msg, type });
     setTimeout(() => setToast(null), type === 'error' ? 8000 : 3500);
@@ -345,7 +344,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     setSaving(true);
     try {
       let shipmentId;
-      // Fix #28: strip client-only temp fields before sending to backend
       const { _imageFile, _imageUrl, ...formData } = form;
       if (editingShipment) {
         await updateShipment(editingShipment.id, formData, tokenRef.current);
@@ -598,7 +596,7 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
           <button className="btn-sidebar-action" onClick={onBackToSite}>
             <i className="fa-solid fa-arrow-left"></i> Back to site
           </button>
-          {/* Fix #25: signOut try/catch so onLogout always fires */}
+          
           <button className="btn-logout" onClick={async () => {
             try { await signOut(); } catch (_) {}
             onLogout();
@@ -1204,7 +1202,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                               toast_show('Image must be under 5MB', 'error');
                               return;
                             }
-                            // Fix #7: revoke previous object URL to prevent memory leak
                             if (form._imageUrl) URL.revokeObjectURL(form._imageUrl);
                             const url = URL.createObjectURL(file);
                             setForm(f => ({ ...f, _imageFile: file, _imageUrl: url }));
@@ -1268,4 +1265,5 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     </div>
   );
 }
+
 

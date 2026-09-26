@@ -1,12 +1,10 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-// Fix #23: true exponential backoff (2s, 4s, 8s) + retry on 5xx
 async function fetchWithRetry(url, options = {}, retries = 3, baseDelayMs = 2000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, options);
 
-      // Fix #10: retry on 5xx (server errors / cold starts) not just network errors
       if (!res.ok) {
         if (res.status >= 500 && attempt < retries) {
           await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, attempt - 1)));
@@ -39,3 +37,4 @@ export async function fetchTracking(numbersRaw) {
   if (!data.success) throw new Error(data.error || 'Unknown error');
   return data.results;
 }
+
