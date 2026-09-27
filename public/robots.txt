@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pulstrack-company.vercel.app/sitemap.xml

@@ -4,28 +4,51 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>PulsTrack - Track Your Package</title>
+    <title>PulsTrack - Track Your Package in Real Time</title>
     <meta name="description" content="Track your PulsTrack shipment in real time. Get live location updates, delivery status, estimated arrival time, and full tracking history." />
-    <meta name="keywords" content="PulsTrack, package tracker, shipment status, delivery tracking, track parcel" />
+    <meta name="keywords" content="PulsTrack, package tracker, shipment tracking, delivery tracking, track parcel, live tracking, real-time shipping" />
     <meta name="robots" content="index, follow" />
+    <meta name="author" content="PulsTrack" />
+    <link rel="canonical" href="https://pulstrack-company.vercel.app/" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>" />
 
-    <!-- Open Graph -->
-    <meta property="og:title" content="PulsTrack - Track Your Package" />
+    <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+    <meta property="og:title" content="PulsTrack - Track Your Package in Real Time" />
     <meta property="og:description" content="Track your PulsTrack shipment in real time. Get live location updates, delivery status, and estimated arrival." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://pulstrack-company.vercel.app/" />
-    <!-- Fix #47: add og:image for social sharing previews -->
     <meta property="og:image" content="https://pulstrack-company.vercel.app/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="PulsTrack" />
+    <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="PulsTrack - Track Your Package" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PulsTrack - Track Your Package in Real Time" />
     <meta name="twitter:description" content="Track your PulsTrack shipment in real time. Live location, delivery status, and full history." />
+    <meta name="twitter:image" content="https://pulstrack-company.vercel.app/og-image.png" />
+
+    <!-- Structured Data (Google Rich Results) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "PulsTrack",
+      "url": "https://pulstrack-company.vercel.app/",
+      "description": "Real-time package tracking platform. Track your shipment live with location updates and delivery status.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://pulstrack-company.vercel.app/track/{tracking_number}"
+        },
+        "query-input": "required name=tracking_number"
+      }
+    }
+    </script>
 
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
