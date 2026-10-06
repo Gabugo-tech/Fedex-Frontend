@@ -898,10 +898,11 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                 </div>
               </div>
 
-              {/* ── SECTION 4: Package Details ── */}
+              {/* ── SECTION 3: Package Details ── */}
               <div className="form-section">
                 <div className="form-section-title">
-                  <span className="form-step-num">3</span>`n                  Package Details
+                  <span className="form-step-num">3</span>
+                  Package Details
                 </div>
                 <div className="form-row">
                   <div className="form-group">
@@ -910,32 +911,14 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                       value={form.weight}
                       onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} />
                   </div>
-                </div>
-
-                {/* Real-time map timing */}
-                <div className="form-row">
                   <div className="form-group">
-                    <label>
-                      Pickup Date &amp; Time
-                      <span className="optional"> — for live map tracking</span>
-                    </label>
-                    <input type="datetime-local"
-                      value={form.pickup_time || ''}
-                      onChange={e => setForm(f => ({ ...f, pickup_time: e.target.value || null }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>
-                      Expected Delivery Date &amp; Time
-                      <span className="optional"> — for live map tracking</span>
-                    </label>
-                    <input type="datetime-local"
-                      value={form.delivery_time || ''}
-                      onChange={e => setForm(f => ({ ...f, delivery_time: e.target.value || null }))} />
+                    <label>Estimated Delivery (ETA) <span className="optional">(optional)</span></label>
+                    <input type="text" placeholder="e.g. October 10, 2026"
+                      value={form.estimated_delivery}
+                      onChange={e => setForm(f => ({ ...f, estimated_delivery: e.target.value }))} />
+                    <p className="field-hint"><i className="fa-solid fa-circle-info"></i> Shown to the customer as the expected delivery date.</p>
                   </div>
                 </div>
-                <p className="field-hint" style={{ marginTop: '-8px' }}>
-                  <i className="fa-solid fa-circle-info"></i> When both are set, the plane on the map moves automatically based on the real clock — no manual updates needed.
-                </p>
 
                 {/* Only show if status is delivered */}
                 {form.status === 'delivered' && (
