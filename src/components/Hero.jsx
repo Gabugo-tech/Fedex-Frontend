@@ -78,7 +78,7 @@ export default function Hero({ onTrack, loading, error }) {
             </div>
             <p className="tracking-hint">
               <i className="fa-solid fa-circle-info"></i>
-              Enter your tracking number above and press <strong>Track</strong> — you can also track multiple shipments by separating them with a comma.
+              Separate multiple tracking numbers with a comma to track them all at once.
             </p>
 
             {inputError && (
