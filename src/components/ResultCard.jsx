@@ -36,11 +36,11 @@ const STATUS_ICON = {
   'out-delivery': 'fa-truck', pending: 'fa-clock', exception: 'fa-triangle-exclamation',
 };
 const STATUS_DESC = {
-  delivered:      'Your package has been delivered.',
-  'in-transit':   'Your package is on its way.',
-  'out-delivery': 'Your package is out for delivery today.',
-  pending:        'Your package is being prepared.',
-  exception:      'There is an issue with your shipment.',
+  delivered:      'statusDescDelivered',
+  'in-transit':   'statusDescInTransit',
+  'out-delivery': 'statusDescOutDelivery',
+  pending:        'statusDescPending',
+  exception:      'statusDescException',
 };
 
 export default function ResultCard({ result, steps }) {
@@ -78,14 +78,14 @@ export default function ResultCard({ result, steps }) {
         </div>
         <div className="rc-status-text">
           <div className="rc-status-label">{result.status_label}</div>
-          <div className="rc-status-desc">{STATUS_DESC[result.status] || ''}</div>
+          <div className="rc-status-desc">{t[STATUS_DESC[result.status]] || ''}</div>
         </div>
       </div>
 
       {/* ══ HEADER ══════════════════════════════════════ */}
       <div className="rc-header">
         <div className="rc-header-left">
-          <div className="rc-tracking-label">Tracking Number</div>
+          <div className="rc-tracking-label">{t.trackingNumberLabel}</div>
           <div className="rc-tracking-number">{result.tracking_number}</div>
           <div className="rc-tags">
             <span className="rc-tag rc-tag-service">
@@ -119,18 +119,18 @@ export default function ResultCard({ result, steps }) {
       <div className="rc-info-grid">
         {(result.receiver_name || result.recipient) && (
           <div className="rc-info-item">
-            <div className="rc-info-label"><i className="fa-solid fa-user"></i> Recipient</div>
+            <div className="rc-info-label"><i className="fa-solid fa-user"></i> {t.recipientLabel}</div>
             <div className="rc-info-value rc-highlight">{result.receiver_name || result.recipient}</div>
           </div>
         )}
         <div className="rc-info-item">
-          <div className="rc-info-label"><i className="fa-solid fa-location-dot"></i> Destination</div>
+          <div className="rc-info-label"><i className="fa-solid fa-location-dot"></i> {t.destinationLabel}</div>
           <div className="rc-info-value rc-highlight">
             {result.receiver_address || result.destination}
           </div>
         </div>
         <div className="rc-info-item">
-          <div className="rc-info-label"><i className="fa-regular fa-calendar"></i> Expected Delivery</div>
+          <div className="rc-info-label"><i className="fa-regular fa-calendar"></i> {t.expectedDelivery}</div>
           <div className={`rc-info-value ${result.delivered_at ? 'rc-delivered-date' : ''}`}>
             {result.delivered_at
               ? <>
@@ -139,16 +139,16 @@ export default function ResultCard({ result, steps }) {
                 </>
               : result.estimated_delivery
                 ? result.estimated_delivery
-                : <span style={{ color: 'var(--gray-400)' }}>Not yet set</span>
+                : <span style={{ color: 'var(--gray-400)' }}>{t.notYetSet}</span>
             }
           </div>
         </div>
         <div className="rc-info-item">
-          <div className="rc-info-label"><i className="fa-solid fa-map-pin"></i> Current Location</div>
+          <div className="rc-info-label"><i className="fa-solid fa-map-pin"></i> {t.currentLocationLabel}</div>
           <div className="rc-info-value rc-highlight">{result.current_location || '—'}</div>
         </div>
         <div className="rc-info-item rc-info-item-route">
-          <div className="rc-info-label"><i className="fa-solid fa-route"></i> Route</div>
+          <div className="rc-info-label"><i className="fa-solid fa-route"></i> {t.routeLabel}</div>
           <div className="rc-route-row">
             <div className="rc-route-point">
               <span className="route-point-tag origin-tag">FROM</span>
@@ -180,31 +180,31 @@ export default function ResultCard({ result, steps }) {
       {(result.weight || result.package_size || result.declared_amount || result.special_note) && (
         <div className="rc-section">
           <div className="rc-section-title">
-            <i className="fa-solid fa-box-open"></i> Package Details
+            <i className="fa-solid fa-box-open"></i> {t.packageDetails}
           </div>
           <div className="rc-pkg-grid">
             {result.weight && (
               <div className="rc-pkg-item">
-                <div className="rc-pkg-label"><i className="fa-solid fa-weight-hanging"></i> Weight</div>
+                <div className="rc-pkg-label"><i className="fa-solid fa-weight-hanging"></i> {t.weightLabel}</div>
                 <div className="rc-pkg-value">{result.weight}</div>
               </div>
             )}
             {result.package_size && (
               <div className="rc-pkg-item">
-                <div className="rc-pkg-label"><i className="fa-solid fa-ruler-combined"></i> Dimensions</div>
+                <div className="rc-pkg-label"><i className="fa-solid fa-ruler-combined"></i> {t.dimensionsLabel}</div>
                 <div className="rc-pkg-value">{result.package_size}</div>
               </div>
             )}
             {result.declared_amount && (
               <div className="rc-pkg-item">
-                <div className="rc-pkg-label"><i className="fa-solid fa-dollar-sign"></i> Declared Value</div>
+                <div className="rc-pkg-label"><i className="fa-solid fa-dollar-sign"></i> {t.declaredValue}</div>
                 <div className="rc-pkg-value">{result.declared_amount}</div>
               </div>
             )}
           </div>
           {result.special_note && (
             <div className="rc-note">
-              <div className="rc-note-label"><i className="fa-solid fa-note-sticky"></i> Special Instructions</div>
+              <div className="rc-note-label"><i className="fa-solid fa-note-sticky"></i> {t.specialInstructions}</div>
               <div className="rc-note-text">{result.special_note}</div>
             </div>
           )}
@@ -217,7 +217,7 @@ export default function ResultCard({ result, steps }) {
           {result.sender_name && (
             <div className="rc-party-card">
               <div className="rc-party-title">
-                <i className="fa-solid fa-user"></i> Sender
+                <i className="fa-solid fa-user"></i> {t.senderLabel}
               </div>
               <div className="rc-party-name">{result.sender_name}</div>
               {result.sender_phone && (
@@ -235,7 +235,7 @@ export default function ResultCard({ result, steps }) {
           {result.receiver_name && (
             <div className="rc-party-card">
               <div className="rc-party-title">
-                <i className="fa-solid fa-user-check"></i> Receiver
+                <i className="fa-solid fa-user-check"></i> {t.receiverLabel}
               </div>
               <div className="rc-party-name">{result.receiver_name}</div>
               {result.receiver_phone && (
@@ -261,7 +261,7 @@ export default function ResultCard({ result, steps }) {
       {/* ══ DELIVERY TIMELINE ═══════════════════════════ */}
       <div className="rc-section">
         <div className="rc-section-title">
-          <i className="fa-solid fa-timeline"></i> Delivery Timeline
+          <i className="fa-solid fa-timeline"></i> {t.deliveryTimeline}
           {timeline.length > 0 && (
             <span className="rc-timeline-count">{timeline.length} update{timeline.length !== 1 ? 's' : ''}</span>
           )}
@@ -269,7 +269,7 @@ export default function ResultCard({ result, steps }) {
         {timeline.length === 0 ? (
           <div className="rc-empty-timeline">
             <i className="fa-solid fa-clock"></i>
-            <p>No tracking updates yet. Check back soon.</p>
+            <p>{t.noUpdatesYet}</p>
           </div>
         ) : (
           <div className="dv-stepper">

@@ -42,7 +42,7 @@ export default function Hero({ onTrack, loading, error }) {
     <section className="hero">
       <div className="container hero-content">
         <div className="hero-badge">
-          <i className="fa-solid fa-truck-fast"></i> Real-Time Package Tracking
+          <i className="fa-solid fa-truck-fast"></i> {t.heroBadge}
         </div>
         <h1>{t.heroTitle}</h1>
         <p>{t.heroSub}</p>
@@ -78,7 +78,7 @@ export default function Hero({ onTrack, loading, error }) {
             </div>
             <p className="tracking-hint">
               <i className="fa-solid fa-circle-info"></i>
-              Separate multiple tracking numbers with a comma to track them all at once.
+              {t.heroHint}
             </p>
 
             {inputError && (
@@ -97,9 +97,9 @@ export default function Hero({ onTrack, loading, error }) {
 
         {/* Trust indicators */}
         <div className="hero-trust">
-          <span><i className="fa-solid fa-shield-halved"></i> Secure & Private</span>
-          <span><i className="fa-solid fa-bolt"></i> Instant Results</span>
-          <span><i className="fa-solid fa-globe"></i> Worldwide Tracking</span>
+          <span><i className="fa-solid fa-shield-halved"></i> {t.heroTrustSecure}</span>
+          <span><i className="fa-solid fa-bolt"></i> {t.heroTrustFast}</span>
+          <span><i className="fa-solid fa-globe"></i> {t.heroTrustGlobal}</span>
         </div>
       </div>
     </section>

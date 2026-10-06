@@ -64,6 +64,38 @@ const ko = {
   footerTerms:      '이용약관',
   footerAccess:     '접근성',
 
+  // Hero new
+  heroBadge:        '실시간 패키지 추적',
+  heroHint:         '여러 운송장 번호를 쉼표로 구분하여 한 번에 추적할 수 있습니다.',
+  heroTrustSecure:  '안전 & 개인정보 보호',
+  heroTrustFast:    '즉시 결과 확인',
+  heroTrustGlobal:  '전 세계 추적',
+
+  // Status descriptions
+  statusDescDelivered:    '패키지가 배송 완료되었습니다.',
+  statusDescInTransit:    '패키지가 배송 중입니다.',
+  statusDescOutDelivery:  '오늘 배송 출발하였습니다.',
+  statusDescPending:      '패키지가 준비 중입니다.',
+  statusDescException:    '배송에 문제가 발생했습니다.',
+
+  // Result card new
+  trackingNumberLabel:  '운송장 번호',
+  recipientLabel:       '수령인',
+  destinationLabel:     '배송지',
+  expectedDelivery:     '예상 배송일',
+  currentLocationLabel: '현재 위치',
+  routeLabel:           '경로',
+  notYetSet:            '미정',
+  packageDetails:       '패키지 정보',
+  weightLabel:          '무게',
+  dimensionsLabel:      '크기',
+  declaredValue:        '신고 금액',
+  specialInstructions:  '특별 지시사항',
+  senderLabel:          '발송인',
+  receiverLabel:        '수령인',
+  deliveryTimeline:     '배송 타임라인',
+  noUpdatesYet:         '아직 추적 정보가 없습니다. 나중에 다시 확인해주세요.',
+
   // Sign in modal
   signInTitle:   '로그인',
   signInSub:     'PulsTrack 계정에 로그인하세요',

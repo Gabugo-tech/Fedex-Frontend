@@ -64,6 +64,38 @@ const en = {
   footerTerms:      'Terms of Use',
   footerAccess:     'Accessibility',
 
+  // Hero new
+  heroBadge:        'Real-Time Package Tracking',
+  heroHint:         'Separate multiple tracking numbers with a comma to track them all at once.',
+  heroTrustSecure:  'Secure & Private',
+  heroTrustFast:    'Instant Results',
+  heroTrustGlobal:  'Worldwide Tracking',
+
+  // Status descriptions
+  statusDescDelivered:    'Your package has been delivered.',
+  statusDescInTransit:    'Your package is on its way.',
+  statusDescOutDelivery:  'Your package is out for delivery today.',
+  statusDescPending:      'Your package is being prepared.',
+  statusDescException:    'There is an issue with your shipment.',
+
+  // Result card new
+  trackingNumberLabel:  'Tracking Number',
+  recipientLabel:       'Recipient',
+  destinationLabel:     'Destination',
+  expectedDelivery:     'Expected Delivery',
+  currentLocationLabel: 'Current Location',
+  routeLabel:           'Route',
+  notYetSet:            'Not yet set',
+  packageDetails:       'Package Details',
+  weightLabel:          'Weight',
+  dimensionsLabel:      'Dimensions',
+  declaredValue:        'Declared Value',
+  specialInstructions:  'Special Instructions',
+  senderLabel:          'Sender',
+  receiverLabel:        'Receiver',
+  deliveryTimeline:     'Delivery Timeline',
+  noUpdatesYet:         'No tracking updates yet. Check back soon.',
+
   // Sign in modal
   signInTitle:   'Sign In',
   signInSub:     'Access your PulsTrack account',
