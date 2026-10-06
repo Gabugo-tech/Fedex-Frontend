@@ -186,9 +186,6 @@ const EMPTY_FORM = {
   weight: '', estimated_delivery: '',
   delivered_at: null, recipient: '',
   map_lat: '', map_lng: '',
-  origin_lat: '', origin_lng: '',
-  dest_lat: '',  dest_lng: '',
-  pickup_time: '', delivery_time: '',
   // Delivio fields
   sender_name: '', sender_phone: '', sender_email: '',
   receiver_name: '', receiver_phone: '', receiver_email: '', receiver_address: '',
@@ -219,11 +216,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   const [mapPicker, setMapPicker]             = useState(null);
   const [sidebarOpen, setSidebarOpen]         = useState(false);
   const [imageUploading, setImageUploading]   = useState(false);
-  const [geoStatus, setGeoStatus]             = useState({ origin: '', dest: '' });
-  const [geoResults, setGeoResults]           = useState({ origin: [], dest: [] });
-  const [geoConfirmed, setGeoConfirmed]       = useState({ origin: '', dest: '' });
-  const geocodeTimers                         = useRef({});
-  // Live token ref — updated by Supabase auth state changes so long sessions don't 401
   const tokenRef = useRef(session?.access_token);
   useEffect(() => { tokenRef.current = session?.access_token; }, [session]);
 
@@ -240,63 +232,9 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
     return () => subscription.unsubscribe();
   }, [onLogout]);
 
-  // ── AUTO-GEOCODE with dropdown picker ────────────────
-  function scheduleGeocode(field, value) {
-    clearTimeout(geocodeTimers.current[field]);
-    // Clear results if input is too short
-    if (!value.trim() || value.trim().length < 3) {
-      setGeoResults(r => ({ ...r, [field]: [] }));
-      setGeoStatus(s => ({ ...s, [field]: '' }));
-      return;
-    }
-
-    geocodeTimers.current[field] = setTimeout(async () => {
-      setGeoStatus(s => ({ ...s, [field]: 'loading' }));
-      setGeoResults(r => ({ ...r, [field]: [] }));
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en', 'User-Agent': 'PulsTrack/1.0 (support@pulstrack.com)' } }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.length === 0) {
-          setGeoStatus(s => ({ ...s, [field]: 'notfound' }));
-        } else {
-          setGeoResults(r => ({ ...r, [field]: data }));
-          setGeoStatus(s => ({ ...s, [field]: 'choose' }));
-        }
-      } catch (err) {
-        console.warn('Geocode failed:', err.message);
-        setGeoStatus(s => ({ ...s, [field]: 'error' }));
-      }
-    }, 700);
-  }
-
-  // Called when admin clicks a result from the dropdown
-  function handleGeoSelect(field, result) {
-    const lat = parseFloat(parseFloat(result.lat).toFixed(6));
-    const lng = parseFloat(parseFloat(result.lon).toFixed(6));
-    const name = result.display_name;
-
-    if (field === 'origin') {
-      setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
-    } else {
-      setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
-    }
-    // Close the dropdown
-    setGeoResults(r => ({ ...r, [field]: [] }));
-    setGeoStatus(s => ({ ...s, [field]: 'ok' }));
-    // Store the confirmed display name for reference
-    setGeoConfirmed(c => ({ ...c, [field]: name }));
-  }
 
   useEffect(() => {
     loadShipments();
-    // Fix: clean up geocode timers on unmount
-    return () => {
-      Object.values(geocodeTimers.current).forEach(id => clearTimeout(id));
-    };
   }, []);
 
   // ── DATA ──────────────────────────────────────────────
@@ -414,12 +352,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       recipient:       s.recipient || '',
       map_lat:         s.map_lat    || '',
       map_lng:         s.map_lng    || '',
-      origin_lat:      s.origin_lat || '',
-      origin_lng:      s.origin_lng || '',
-      dest_lat:        s.dest_lat   || '',
-      dest_lng:        s.dest_lng   || '',
-      pickup_time:     s.pickup_time   ? s.pickup_time.slice(0, 16)   : '',
-      delivery_time:   s.delivery_time ? s.delivery_time.slice(0, 16) : '',
       // Delivio fields
       sender_name:      s.sender_name      || '',
       sender_phone:     s.sender_phone     || '',
@@ -499,8 +431,6 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
   // ── MAP PICKER ────────────────────────────────────────
   function handleMapPick(lat, lng) {
     if (mapPicker === 'current')  setForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
-    if (mapPicker === 'origin')   setForm(f => ({ ...f, origin_lat: lat, origin_lng: lng }));
-    if (mapPicker === 'dest')     setForm(f => ({ ...f, dest_lat: lat, dest_lng: lng }));
     if (mapPicker === 'location') setLocationForm(f => ({ ...f, map_lat: lat, map_lng: lng }));
     setMapPicker(null);
   }
@@ -1241,18 +1171,8 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       {/* MAP PICKER MODAL */}
       {mapPicker && (
         <AdminMapPicker
-          initialLat={
-            mapPicker === 'current'  ? form.map_lat    :
-            mapPicker === 'origin'   ? form.origin_lat :
-            mapPicker === 'dest'     ? form.dest_lat   :
-            locationForm.map_lat
-          }
-          initialLng={
-            mapPicker === 'current'  ? form.map_lng    :
-            mapPicker === 'origin'   ? form.origin_lng :
-            mapPicker === 'dest'     ? form.dest_lng   :
-            locationForm.map_lng
-          }
+          initialLat={mapPicker === 'current' ? form.map_lat : locationForm.map_lat}
+          initialLng={mapPicker === 'current' ? form.map_lng : locationForm.map_lng}
           onConfirm={handleMapPick}
           onClose={() => setMapPicker(null)}
         />
