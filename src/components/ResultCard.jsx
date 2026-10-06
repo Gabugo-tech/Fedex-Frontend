@@ -35,6 +35,13 @@ const STATUS_ICON = {
   delivered: 'fa-circle-check', 'in-transit': 'fa-plane',
   'out-delivery': 'fa-truck', pending: 'fa-clock', exception: 'fa-triangle-exclamation',
 };
+const STATUS_DESC = {
+  delivered:      'Your package has been delivered.',
+  'in-transit':   'Your package is on its way.',
+  'out-delivery': 'Your package is out for delivery today.',
+  pending:        'Your package is being prepared.',
+  exception:      'There is an issue with your shipment.',
+};
 
 export default function ResultCard({ result, steps }) {
   const { t } = useLang();
@@ -43,9 +50,8 @@ export default function ResultCard({ result, steps }) {
 
   const statusCls  = STATUS_CLASS[result.status] || 'pending';
   const hasMap     = !!(result.map_lat && result.map_lng);
-  const timeline   = result.timeline || []; // null-safe
+  const timeline   = result.timeline || [];
 
-  // Parse service_tags from comma-separated string
   const serviceTags = result.service_tags
     ? result.service_tags.split(',').map(s => s.trim()).filter(Boolean)
     : [];
@@ -65,10 +71,21 @@ export default function ResultCard({ result, steps }) {
   return (
     <div className="result-card">
 
+      {/* ══ STATUS BANNER ═══════════════════════════════ */}
+      <div className={`rc-status-banner ${statusCls}`}>
+        <div className="rc-status-icon">
+          <i className={`fa-solid ${STATUS_ICON[result.status] || 'fa-box'}`}></i>
+        </div>
+        <div className="rc-status-text">
+          <div className="rc-status-label">{result.status_label}</div>
+          <div className="rc-status-desc">{STATUS_DESC[result.status] || ''}</div>
+        </div>
+      </div>
+
       {/* ══ HEADER ══════════════════════════════════════ */}
       <div className="rc-header">
         <div className="rc-header-left">
-          <div className="rc-tracking-label">Tracking Code</div>
+          <div className="rc-tracking-label">Tracking Number</div>
           <div className="rc-tracking-number">{result.tracking_number}</div>
           <div className="rc-tags">
             <span className="rc-tag rc-tag-service">
@@ -86,22 +103,15 @@ export default function ResultCard({ result, steps }) {
             )}
           </div>
         </div>
-
-        <div className="rc-header-right">
-          <span className={`status-badge ${statusCls}`}>
-            <i className={`fa-solid ${STATUS_ICON[result.status] || 'fa-box'}`}></i>
-            {result.status_label}
-          </span>
-          <div className="rc-header-actions">
-            <button className="btn-copy" onClick={copyTracking} title="Copy tracking number">
-              <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`}></i>
-              <span>{copied ? 'Copied!' : 'Copy'}</span>
-            </button>
-            <button className="btn-share" onClick={shareLink} title="Share tracking link">
-              <i className={`fa-solid ${linkCopied ? 'fa-check' : 'fa-share-nodes'}`}></i>
-              <span>{linkCopied ? 'Link Copied!' : 'Share'}</span>
-            </button>
-          </div>
+        <div className="rc-header-actions">
+          <button className="btn-copy" onClick={copyTracking} title="Copy tracking number">
+            <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`}></i>
+            <span>{copied ? 'Copied!' : 'Copy'}</span>
+          </button>
+          <button className="btn-share" onClick={shareLink} title="Share tracking link">
+            <i className={`fa-solid ${linkCopied ? 'fa-check' : 'fa-share-nodes'}`}></i>
+            <span>{linkCopied ? 'Link Copied!' : 'Share'}</span>
+          </button>
         </div>
       </div>
 
@@ -109,36 +119,36 @@ export default function ResultCard({ result, steps }) {
       <div className="rc-info-grid">
         {(result.receiver_name || result.recipient) && (
           <div className="rc-info-item">
-            <div className="rc-info-label">Recipient</div>
-            <div className="rc-info-value rc-highlight">
-              {result.receiver_name || result.recipient}
-            </div>
+            <div className="rc-info-label"><i className="fa-solid fa-user"></i> Recipient</div>
+            <div className="rc-info-value rc-highlight">{result.receiver_name || result.recipient}</div>
           </div>
         )}
         <div className="rc-info-item">
-          <div className="rc-info-label">Destination</div>
+          <div className="rc-info-label"><i className="fa-solid fa-location-dot"></i> Destination</div>
           <div className="rc-info-value rc-highlight">
             {result.receiver_address || result.destination}
           </div>
         </div>
         <div className="rc-info-item">
-          <div className="rc-info-label">
-            <i className="fa-regular fa-calendar"></i> ETA
-          </div>
-          <div className="rc-info-value">
+          <div className="rc-info-label"><i className="fa-regular fa-calendar"></i> Expected Delivery</div>
+          <div className={`rc-info-value ${result.delivered_at ? 'rc-delivered-date' : ''}`}>
             {result.delivered_at
-              ? new Date(result.delivered_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-              : result.estimated_delivery || '—'}
+              ? <>
+                  <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)', marginRight: 5 }}></i>
+                  {new Date(result.delivered_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </>
+              : result.estimated_delivery
+                ? result.estimated_delivery
+                : <span style={{ color: 'var(--gray-400)' }}>Not yet set</span>
+            }
           </div>
         </div>
         <div className="rc-info-item">
-          <div className="rc-info-label">
-            <i className="fa-solid fa-location-dot"></i> Current Location
-          </div>
-          <div className="rc-info-value rc-highlight">{result.current_location}</div>
+          <div className="rc-info-label"><i className="fa-solid fa-map-pin"></i> Current Location</div>
+          <div className="rc-info-value rc-highlight">{result.current_location || '—'}</div>
         </div>
         <div className="rc-info-item rc-info-item-route">
-          <div className="rc-info-label">Route</div>
+          <div className="rc-info-label"><i className="fa-solid fa-route"></i> Route</div>
           <div className="rc-route-row">
             <div className="rc-route-point">
               <span className="route-point-tag origin-tag">FROM</span>
@@ -181,20 +191,20 @@ export default function ResultCard({ result, steps }) {
             )}
             {result.package_size && (
               <div className="rc-pkg-item">
-                <div className="rc-pkg-label"><i className="fa-solid fa-ruler-combined"></i> Size</div>
+                <div className="rc-pkg-label"><i className="fa-solid fa-ruler-combined"></i> Dimensions</div>
                 <div className="rc-pkg-value">{result.package_size}</div>
               </div>
             )}
             {result.declared_amount && (
               <div className="rc-pkg-item">
-                <div className="rc-pkg-label"><i className="fa-solid fa-dollar-sign"></i> Amount</div>
+                <div className="rc-pkg-label"><i className="fa-solid fa-dollar-sign"></i> Declared Value</div>
                 <div className="rc-pkg-value">{result.declared_amount}</div>
               </div>
             )}
           </div>
           {result.special_note && (
             <div className="rc-note">
-              <div className="rc-note-label">Note</div>
+              <div className="rc-note-label"><i className="fa-solid fa-note-sticky"></i> Special Instructions</div>
               <div className="rc-note-text">{result.special_note}</div>
             </div>
           )}
@@ -252,47 +262,60 @@ export default function ResultCard({ result, steps }) {
       <div className="rc-section">
         <div className="rc-section-title">
           <i className="fa-solid fa-timeline"></i> Delivery Timeline
+          {timeline.length > 0 && (
+            <span className="rc-timeline-count">{timeline.length} update{timeline.length !== 1 ? 's' : ''}</span>
+          )}
         </div>
-        <div className="dv-stepper">
-          {steps.map((step, i) => {
-            const isDone    = i < result.progress_step;
-            const isCurrent = i === result.progress_step;
+        {timeline.length === 0 ? (
+          <div className="rc-empty-timeline">
+            <i className="fa-solid fa-clock"></i>
+            <p>No tracking updates yet. Check back soon.</p>
+          </div>
+        ) : (
+          <div className="dv-stepper">
+            {steps.map((step, i) => {
+              const isDone    = i < result.progress_step;
+              const isCurrent = i === result.progress_step;
 
-            // Match events to steps — fix: prevent "Delivered" events bleeding into "Out for Delivery"
-            const stepEvents = timeline.filter(evt => {
-              const s = evt.status?.toLowerCase() || '';
-              const l = step.label.toLowerCase();
-              if (l.includes('label'))     return s.includes('label') || s.includes('creat');
-              if (l.includes('picked'))    return s.includes('pick');
-              if (l.includes('transit'))   return s.includes('transit') || s.includes('hub') || s.includes('custom') || s.includes('depart') || s.includes('arriv');
-              if (l === 'delivered')       return s.startsWith('delivered') || s === 'delivered';
-              if (l.includes('delivery'))  return (s.includes('deliver') || s.includes('vehicle') || s.includes('way')) && !s.startsWith('delivered');
-              return false;
-            });
+              const stepEvents = timeline.filter(evt => {
+                const s = evt.status?.toLowerCase() || '';
+                const l = step.label.toLowerCase();
+                if (l.includes('label'))    return s.includes('label') || s.includes('creat');
+                if (l.includes('picked'))   return s.includes('pick');
+                if (l.includes('transit'))  return s.includes('transit') || s.includes('hub') || s.includes('custom') || s.includes('depart') || s.includes('arriv');
+                if (l === 'delivered')      return s.startsWith('delivered') || s === 'delivered';
+                if (l.includes('delivery')) return (s.includes('deliver') || s.includes('vehicle') || s.includes('way')) && !s.startsWith('delivered');
+                return false;
+              });
 
-            return (
-              <div key={step.label} className={`dv-step ${isDone ? 'dv-done' : isCurrent ? 'dv-current' : 'dv-pending'}`}>
-                {i < steps.length - 1 && <div className="dv-line"></div>}
-                <div className="dv-circle">
-                  {(isDone || isCurrent) && <i className="fa-solid fa-check"></i>}
+              return (
+                <div key={step.label} className={`dv-step ${isDone ? 'dv-done' : isCurrent ? 'dv-current' : 'dv-pending'}`}>
+                  {i < steps.length - 1 && <div className="dv-line"></div>}
+                  <div className="dv-circle">
+                    {(isDone || isCurrent) && <i className="fa-solid fa-check"></i>}
+                  </div>
+                  <div className="dv-content">
+                    <div className="dv-step-label">{step.label}</div>
+                    {stepEvents.map((evt, ei) => (
+                      <div key={evt.id || ei} className="dv-event">
+                        <span className={`dv-event-pill ${isDone || isCurrent ? 'dv-pill-active' : 'dv-pill-dim'}`}>
+                          {evt.status}
+                        </span>
+                        <div className="dv-event-date">
+                          <i className="fa-regular fa-clock" style={{ marginRight: 4, opacity: 0.6 }}></i>
+                          {evt.date}
+                          {evt.location && <> &nbsp;·&nbsp; <i className="fa-solid fa-location-dot" style={{ marginRight: 3, opacity: 0.6 }}></i>{evt.location}</>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="dv-content">
-                  <div className="dv-step-label">{step.label}</div>
-                  {stepEvents.map((evt, ei) => (
-                    <div key={evt.id || ei} className="dv-event">
-                      <span className={`dv-event-pill ${isDone || isCurrent ? 'dv-pill-active' : 'dv-pill-dim'}`}>
-                        {evt.status}
-                      </span>
-                      <div className="dv-event-date">{evt.date}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Unmatched events fallback */}
+        {/* Unmatched events */}
         {(() => {
           const matched = ['label', 'creat', 'pick', 'transit', 'hub', 'custom', 'depart', 'arriv', 'deliver', 'vehicle', 'way'];
           const unmatched = timeline.filter(evt => {
@@ -305,18 +328,12 @@ export default function ResultCard({ result, steps }) {
               {unmatched.map((evt, i) => (
                 <div key={evt.id || i} className="dv-event">
                   <span className="dv-event-pill dv-pill-active">{evt.status}</span>
-                  <div className="dv-event-date">{evt.date} — {evt.location}</div>
+                  <div className="dv-event-date">{evt.date}{evt.location && ` · ${evt.location}`}</div>
                 </div>
               ))}
             </div>
           );
         })()}
-
-        {timeline.length === 0 && (
-          <p style={{ color: 'var(--gray-400)', fontSize: '13px', paddingLeft: '44px' }}>
-            {t.noEvents}
-          </p>
-        )}
       </div>
 
     </div>

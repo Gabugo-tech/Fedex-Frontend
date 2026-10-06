@@ -19,7 +19,6 @@ export default function Hero({ onTrack, loading, error }) {
     }
   }, [loading]);
 
-  // Sync error ref so the scroll effect can check it
   useEffect(() => {
     if (error) hadErrorRef.current = true;
   }, [error]);
@@ -33,7 +32,6 @@ export default function Hero({ onTrack, loading, error }) {
     didTrackRef.current  = true;
     hadErrorRef.current  = false;
     onTrack(input);
-    // We don't clear here; clear happens in App after successful result
   }
 
   function handleKey(e) {
@@ -43,27 +41,28 @@ export default function Hero({ onTrack, loading, error }) {
   return (
     <section className="hero">
       <div className="container hero-content">
+        <div className="hero-badge">
+          <i className="fa-solid fa-truck-fast"></i> Real-Time Package Tracking
+        </div>
         <h1>{t.heroTitle}</h1>
         <p>{t.heroSub}</p>
 
         <div className="tracking-card">
-          <div className="tracking-tabs">
-            <button className="tab active">{t.trackBtn}</button>
-          </div>
-
           <div className="tracking-body">
-            
-            <label htmlFor="trackingInput">{t.trackLabel}</label>
+            <label htmlFor="trackingInput" className="tracking-main-label">
+              <i className="fa-solid fa-magnifying-glass"></i> {t.trackLabel}
+            </label>
             <div className="tracking-input-row">
               <input
                 id="trackingInput"
                 type="text"
-                placeholder={t.trackPlaceholder}
+                placeholder="e.g. PLT-2026-A4K9BZ2M"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 className={inputError ? 'error' : ''}
                 maxLength={200}
+                autoComplete="off"
               />
               <button
                 className="btn-track"
@@ -77,8 +76,11 @@ export default function Hero({ onTrack, loading, error }) {
                 }
               </button>
             </div>
+            <p className="tracking-hint">
+              <i className="fa-solid fa-circle-info"></i>
+              Enter your tracking number above and press <strong>Track</strong> — you can also track multiple shipments by separating them with a comma.
+            </p>
 
-            
             {inputError && (
               <p role="alert" aria-live="assertive" className="error-hint">
                 <i className="fa-solid fa-triangle-exclamation"></i> Please enter a tracking number.
@@ -92,8 +94,14 @@ export default function Hero({ onTrack, loading, error }) {
             )}
           </div>
         </div>
+
+        {/* Trust indicators */}
+        <div className="hero-trust">
+          <span><i className="fa-solid fa-shield-halved"></i> Secure & Private</span>
+          <span><i className="fa-solid fa-bolt"></i> Instant Results</span>
+          <span><i className="fa-solid fa-globe"></i> Worldwide Tracking</span>
+        </div>
       </div>
     </section>
   );
 }
-
