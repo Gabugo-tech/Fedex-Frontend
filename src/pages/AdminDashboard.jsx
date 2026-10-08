@@ -186,6 +186,9 @@ const EMPTY_FORM = {
   weight: '', estimated_delivery: '',
   delivered_at: null, recipient: '',
   map_lat: '', map_lng: '',
+  origin_lat: '', origin_lng: '',
+  dest_lat: '', dest_lng: '',
+  pickup_time: '', delivery_time: '',
   // Delivio fields
   sender_name: '', sender_phone: '', sender_email: '',
   receiver_name: '', receiver_phone: '', receiver_email: '', receiver_address: '',
@@ -352,6 +355,12 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
       recipient:       s.recipient || '',
       map_lat:         s.map_lat    || '',
       map_lng:         s.map_lng    || '',
+      origin_lat:      s.origin_lat || '',
+      origin_lng:      s.origin_lng || '',
+      dest_lat:        s.dest_lat   || '',
+      dest_lng:        s.dest_lng   || '',
+      pickup_time:     s.pickup_time   ? s.pickup_time.slice(0, 16)   : '',
+      delivery_time:   s.delivery_time ? s.delivery_time.slice(0, 16) : '',
       // Delivio fields
       sender_name:      s.sender_name      || '',
       sender_phone:     s.sender_phone     || '',
@@ -919,6 +928,23 @@ export default function AdminDashboard({ session, onLogout, onBackToSite }) {
                     <p className="field-hint"><i className="fa-solid fa-circle-info"></i> Shown to the customer as the expected delivery date.</p>
                   </div>
                 </div>
+
+                {/* Moving dot timing */}
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Pickup Date &amp; Time <span className="optional">(for moving map dot)</span></label>
+                    <input type="datetime-local"
+                      value={form.pickup_time || ''}
+                      onChange={e => setForm(f => ({ ...f, pickup_time: e.target.value || null }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Expected Delivery Date &amp; Time <span className="optional">(for moving map dot)</span></label>
+                    <input type="datetime-local"
+                      value={form.delivery_time || ''}
+                      onChange={e => setForm(f => ({ ...f, delivery_time: e.target.value || null }))} />
+                  </div>
+                </div>
+                <p className="field-hint"><i className="fa-solid fa-circle-info"></i> When both are set, the red dot moves automatically from origin to destination based on the real clock.</p>
 
                 {/* Only show if status is delivered */}
                 {form.status === 'delivered' && (

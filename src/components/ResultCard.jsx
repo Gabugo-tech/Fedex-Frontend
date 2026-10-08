@@ -49,7 +49,8 @@ export default function ResultCard({ result, steps }) {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const statusCls  = STATUS_CLASS[result.status] || 'pending';
-  const hasMap     = !!(result.map_lat && result.map_lng);
+  const hasMap = !!(result.map_lat && result.map_lng) ||
+                 !!(result.origin_lat && result.origin_lng && result.dest_lat && result.dest_lng);
   const timeline   = result.timeline || [];
 
   const serviceTags = result.service_tags
@@ -169,10 +170,16 @@ export default function ResultCard({ result, steps }) {
       {/* ══ LIVE MAP ════════════════════════════════════ */}
       {hasMap && (
         <TrackingMap
-          lat={parseFloat(result.map_lat)}
-          lng={parseFloat(result.map_lng)}
+          lat={result.map_lat ? parseFloat(result.map_lat) : null}
+          lng={result.map_lng ? parseFloat(result.map_lng) : null}
           label={result.current_location}
           status={result.status}
+          originLat={result.origin_lat ? parseFloat(result.origin_lat) : null}
+          originLng={result.origin_lng ? parseFloat(result.origin_lng) : null}
+          destLat={result.dest_lat ? parseFloat(result.dest_lat) : null}
+          destLng={result.dest_lng ? parseFloat(result.dest_lng) : null}
+          pickupTime={result.pickup_time || null}
+          deliveryTime={result.delivery_time || null}
         />
       )}
 
